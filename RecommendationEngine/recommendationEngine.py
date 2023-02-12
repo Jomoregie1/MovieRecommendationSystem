@@ -8,6 +8,8 @@ movies_data = pd.read_csv('C:/Users/Joseph/PycharmProjects/MovieRecommendationSy
 tags_data = pd.read_csv('C:/Users/Joseph/PycharmProjects/MovieRecommendationSystem/Movies_data/tags.csv',
                         usecols=['userId', 'movieId', 'tag'])
 
+
+
 # Split the 'genres' column on the '|' character
 genres_df = movies_data['genres'].str.split('|', expand=True)
 # Rename the columns to 'genre_0', 'genre_1', etc.
@@ -18,14 +20,42 @@ movies_data = pd.concat([movies_data, genres_df], axis=1)
 movies_long = pd.melt(movies_data, id_vars=['movieId', 'title'],
                       value_vars=['genre_0', 'genre_1', 'genre_2', 'genre_3', 'genre_4', 'genre_5', 'genre_6',
                                   'genre_7', 'genre_8', 'genre_9'], value_name='genre').drop('variable',
-                                                                                             axis=1).dropna()
+                                                                    axis=1).dropna()
+
+
 # Drop any rows with missing genre values
 movies_long = movies_long.dropna(subset=['genre'])
+
+
+
+# Extract unique genres
+unique_genres = movies_long['genre'].unique()
+
+# Create a data frame with a genreId column and a genre column
+genres_df = pd.DataFrame({'genreId': range(len(unique_genres)), 'genre': unique_genres})
+
+# Print the genres data frame
+print(genres_df)
+
+genre_movies_df = pd.merge(movies_long, genres_df, on='genre')
+
+# Select the genreId and movieId columns
+genre_movie_ids_df = genre_movies_df[['genreId', 'movieId']]
+
+# Print the genre-movie ID data frame
+print(genre_movie_ids_df)
+
+
+
+
 # Drop the 'genres' column from the original DataFrame
 movies_data = movies_data.drop('genres', axis=1)
 # Create a new DataFrame with unique genre values and the movie titles that belong to each genre
 genres_data = movies_long.groupby('genre')['movieId'].apply(list).reset_index()
 genres_data.columns = ['genre', 'movieIds']
+
+
+
 
 # Split the year from the movie titles
 new_df = movies_data['title'].str.split('(', n=1, expand=True)
@@ -44,7 +74,6 @@ combined_year_movies_data['year'] = combined_year_movies_data['year'].fillna(0)
 combined_year_movies_data['year'] = combined_year_movies_data['year'].apply(lambda x: int(str(x).strip(') ')))
 combined_year_movies_data['title'] = combined_year_movies_data['title'].apply(lambda x: str(x).strip())
 
-print(combined_data)
 
 # creates a pivot table and places a 0 where empty data is, we are going to assume that where there is a 0 the movie
 # has not been watched.
