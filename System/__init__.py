@@ -1,7 +1,5 @@
 import mysql.connector
 
-
-
 # Connect to the database
 mydb = mysql.connector.connect(
     host="localhost",
@@ -10,7 +8,6 @@ mydb = mysql.connector.connect(
     database="movierecommendation"
 )
 cursor = mydb.cursor()
-
 mydb.commit()
 cursor.close()
 mydb.close()
