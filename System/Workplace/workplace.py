@@ -4,6 +4,10 @@ from sklearn.metrics import mean_squared_error
 import numpy as np
 import mysql.connector
 import pandas as pd
+import spacy
+
+# # initialising spacy model, this model has word vectors included.
+# nlp = spacy.load('en_core_web_lg')
 
 mydb = mysql.connector.connect(
     host="localhost",
@@ -11,16 +15,6 @@ mydb = mysql.connector.connect(
     password="root",
     database="movierecommendation"
 )
-
-movies_df = pd.read_csv('C:/Users/Joseph/PycharmProjects/MovieRecommendationSystem/movies.csv',
-                        usecols=["movieId", "title"])
-
-ratings_df = pd.read_csv('C:/Users/Joseph/PycharmProjects/MovieRecommendationSystem/ratings.csv',
-                         usecols=["userId", "movieId", "rating"])
-
-merged_df = pd.merge(movies_df, ratings_df, on='movieId')
-
-merged_df_pivot = pd.pivot_table(merged_df, values='rating', index=['userId'], columns=['title'])
 
 item_user_ratings_df = pd.read_sql('SELECT m.title,u.userId,r.ratings FROM movies as m JOIN ratings as r ON '
                                    'm.movieId '
