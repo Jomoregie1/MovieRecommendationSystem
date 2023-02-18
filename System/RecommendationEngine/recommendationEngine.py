@@ -173,8 +173,7 @@ def recommend_movies_based_on_year(year, user):
     print(f'{top_movies}, only showing for testing purposes')
 
 
-def recommend_movies_based_on_tags(phrase,user):
-
+def recommend_movies_based_on_tags(phrase, user):
     # initialising spacy model, this model has word vectors included.
     nlp = spacy.load("en_core_web_lg")
 
@@ -201,7 +200,6 @@ def recommend_movies_based_on_tags(phrase,user):
 
     # This iterates through each tag and retrieves the money for each associated tag.
     for tag in highly_related_tags:
-
         titles = movie_and_tags[movie_and_tags['tag'] == tag[0]]
         list_of_titles = titles['title'].tolist()
         movie_titles.update(list_of_titles)
@@ -209,7 +207,7 @@ def recommend_movies_based_on_tags(phrase,user):
 
     movie_titles_list = list(movie_titles)
 
-#     have a list for all the movies the user has watched.
+    #   have a list for all the movies the user has watched.
     seen_movies = ratings_pivot_table.loc[user][ratings_pivot_table.loc[user] > 0].index.tolist()
     movie_titles_list = [title for title in movie_titles_list if title not in seen_movies]
 
@@ -233,20 +231,49 @@ def recommend_movies_based_on_tags(phrase,user):
         print(f'{rank}:{movie[0]}')
         rank = rank + 1
 
-
     print(f'{top_movies}, only showing for testing purposes')
 
 
-def recommend_movies_based_on_year_and_genre():
-    pass
+def recommend_movies_based_on_year_and_genre(year, genre, user):
+    sql_query = pd.read_sql(
+        f"select m.title from movies as m inner join movie_genre as mg on m.movieId = mg.movieId Inner join "
+        f"genres as g on mg.genre_id = g.genre_id where g.name like '%{genre}%' and year = {year}", con=mydb)
+
+    movie_titles = sql_query['title'].tolist()
+
+    seen_movies = ratings_pivot_table.loc[user][ratings_pivot_table.loc[user] > 0].index.tolist()
+    movie_titles_list = [title for title in movie_titles if title not in seen_movies]
+
+    movie_ratings = []
+
+    for title in movie_titles_list:
+        try:
+            movie_index = item_pred_df.index.tolist().index(title)
+            user_rating = item_pred_df.iloc[movie_index, user]
+            movie_ratings.append((title, user_rating))
+        except ValueError:
+            print(f'{title} has not been found --- for testing purposes')
+            continue
+
+    # Sort the list of movie ratings by user rating in descending order
+    movie_ratings_sorted = sorted(movie_ratings, key=lambda x: x[1], reverse=True)
+
+    top_movies = movie_ratings_sorted[:3]
+    rank = 1
+    for movie in top_movies:
+        print(f'{rank}:{movie[0]}')
+        rank = rank + 1
+
+    print(f'{top_movies}, only showing for testing purposes')
 
 
 # TODO after meeting: based of similar actors/directors/titles/genre's -- user-based collaborative filtering
 #  TODO 3 Create more recommendations based possibly on actors, directors, and also similar users.
 
 
-# recommend_movies_based_on_tags('happy',1)
+# recommend_movies_based_on_year_and_genre(1990, 'action', 1)
+# recommend_movies_based_on_tags('happy', 1)
 # recommend_movie_based_on_genre('drama', 11)
 # recommend_movies_based_on_year(1990, 1)
-# recommend_movie_based_on_title("hun", 5)
+# recommend_movie_based_on_similar_title("hun", 5)
 # recommend_movies_based_on_user(4, 3)
