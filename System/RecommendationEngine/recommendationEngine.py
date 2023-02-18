@@ -82,7 +82,7 @@ def recommend_movies_based_on_user(user_id, num_recommended_movies):
     print('The list of the Recommended potential hidden gems! \n')
     rank = 1
 
-    # To prevent the same movie recommended twice, a quick check too see
+    # To prevent the same movie recommended twice, a quick check to see
     # if the movie was being recommended is in the previous list. if it is, it is popped out.
     for recommended_movie in sorted_average_by_sim_users[:num_recommended_movies]:
         if recommended_movie[0] in sorted_rm[:num_recommended_movies]:
@@ -354,7 +354,7 @@ def recommend_movies_based_on_year_and_genre(year, genre, user):
 
 # recommend_movies_based_on_year_and_genre(1990, 'action', 1)
 # recommend_movies_based_on_tags('football', 3)
-# recommend_movie_based_on_genre('action', 12)
+# recommend_movie_based_on_genre('action', 373)
 # recommend_movies_based_on_year(1990, 1)
 # recommend_movie_based_on_similar_title("hun", 5)
 # recommend_movies_based_on_user(2, 3)
