@@ -24,8 +24,22 @@ similarities = cosine_similarity(item_pred_df)
 cosine_similarity_df = pd.DataFrame(similarities, index=item_pred_df.index, columns=item_pred_df.index)
 
 
-# TODO I want to change this to recommend not just the highest rated movie the user has not watched but to compare against similar users and recommend that way.
+# This recommends based of movies the user has not seen, it takes the amount of movies the user would like recommended.
 def recommend_movies_based_on_user(user_id, num_recommended_movies):
+    # I want to find the 5 nearest neighbours to this userId, so I use Knn to achieve this.
+    knn = NearestNeighbors(metric='cosine', algorithm='brute')
+    knn.fit(pred_df.values)
+    distances, indices = knn.kneighbors(pred_df.values, n_neighbors=5)
+
+    user_index = pred_df.index.tolist().index(user_id)  # get an index for a given user
+
+    sim_users = indices[user_index].tolist()  # make list for similar movies
+    user_distances = distances[user_index].tolist()  # the list for distances of similar users
+    id_user = sim_users.index(user_index)  # get the position of the users itself in indices and distances
+
+    sim_users.remove(user_index)
+    user_distances.pop(id_user)  # remove the movie itself in distances
+
     print(f'The list of the Movies {user_id} Has Watched -- Only showing for test purposes \n')
 
     movies_watched = ratings_pivot_table.loc[user_id][ratings_pivot_table.loc[user_id] > 0].index.tolist()
@@ -48,15 +62,40 @@ def recommend_movies_based_on_user(user_id, num_recommended_movies):
     # a list of recommended movies sorted according to predicted ratings in descending order.
     sorted_rm = sorted(recommended_movies, key=lambda x: x[1], reverse=True)
 
-    # outputs a list of recommended movies, with the rank of the movie.
-    print('The list of the Recommended Movies \n')
+    print('The list of the Recommended Movies for you! \n')
     rank = 1
     for recommended_movie in sorted_rm[:num_recommended_movies]:
         print(f'{rank}: {recommended_movie[0]} - predicted rating:{round(recommended_movie[1], 1)}')
         rank = rank + 1
 
+    average_sim_users_rating = []
+    avg_movie_rating = 0
 
-# TODO add functionality to find also the similar users and use that to give the best movie based on title.
+    for movie in sorted_rm:
+        for user in sim_users:
+            avg_movie_rating += pred_df.loc[user, movie[0]]
+
+        avg_movie_rating = avg_movie_rating / len(sim_users)
+        average_sim_users_rating.append((movie, avg_movie_rating))
+        avg_movie_rating = 0
+
+    sorted_average_by_sim_users = sorted(average_sim_users_rating, key=lambda x: x[1], reverse=True)
+    print(sorted_average_by_sim_users)
+
+    # outputs a list of recommended movies, with the rank of the movie.
+    print('\n')
+    print('The list of the Recommended potential hidden gems! \n')
+    rank = 1
+
+    for recommended_movie in sorted_average_by_sim_users[:num_recommended_movies]:
+        if recommended_movie[0] in sorted_rm[:num_recommended_movies]:
+            index_of_recommended_movie = sorted_average_by_sim_users.index(recommended_movie)
+            sorted_average_by_sim_users.pop(index_of_recommended_movie)
+        else:
+            print(f'{rank}: {recommended_movie[0][0]} - predicted rating:{round(recommended_movie[0][1], 1)}')
+            rank = rank + 1
+
+
 # Recommends a movie based of the title, checks if a user has viewed the movie and returns a list of movies similar
 # to the title but that have not been seen.
 def recommend_movie_based_on_similar_title(title, user):
@@ -267,13 +306,9 @@ def recommend_movies_based_on_year_and_genre(year, genre, user):
     print(f'{top_movies}, only showing for testing purposes')
 
 
-# TODO after meeting: based of similar actors/directors/titles/genre's -- user-based collaborative filtering
-#  TODO 3 Create more recommendations based possibly on actors, directors, and also similar users.
-
-
 # recommend_movies_based_on_year_and_genre(1990, 'action', 1)
 # recommend_movies_based_on_tags('happy', 1)
 # recommend_movie_based_on_genre('drama', 11)
 # recommend_movies_based_on_year(1990, 1)
 # recommend_movie_based_on_similar_title("hun", 5)
-# recommend_movies_based_on_user(4, 3)
+# recommend_movies_based_on_user(2, 3)
