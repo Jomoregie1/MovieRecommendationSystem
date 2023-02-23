@@ -352,9 +352,9 @@ def recommend_movies_based_on_year_and_genre(year, genre, user):
     print(f'{top_movies}, only showing for testing purposes')
 
 
-# recommend_movies_based_on_year_and_genre(1990, 'action', 1)
+# recommend_movies_based_on_year_and_genre(1990, 'act', 1)
 # recommend_movies_based_on_tags('football', 3)
 # recommend_movie_based_on_genre('action', 373)
 # recommend_movies_based_on_year(1990, 1)
-# recommend_movie_based_on_similar_title("hun", 5)
+# recommend_movie_based_on_similar_title("hug", 5)
 # recommend_movies_based_on_user(2, 3)

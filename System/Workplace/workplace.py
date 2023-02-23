@@ -4,6 +4,7 @@ from sklearn.metrics import mean_squared_error
 import numpy as np
 import mysql.connector
 import pandas as pd
+import matplotlib.pyplot as plt
 import spacy
 
 # # initialising spacy model, this model has word vectors included.
@@ -22,11 +23,13 @@ item_user_ratings_df = pd.read_sql('SELECT m.title,u.userId,r.ratings FROM movie
 
 ratings_table = pd.pivot_table(item_user_ratings_df, values='ratings', index=['userId'], columns=['title'])
 
+
 # calculating the sparsity of this data
 number_of_empty = ratings_table.isnull().values.sum()
 total_number = ratings_table.size
-sparsity = number_of_empty / total_number
-print(f'The sparsity of this data set is {sparsity * 100}%, this percentage represents how sparse our dataset is.')
+sparsity = round(number_of_empty / total_number,2)
+# print(f'The sparsity of this data set is {sparsity * 100}%, this percentage represents how sparse our dataset is.')
+
 
 # Matrix factorisation
 # Normalising our data (centring our data by deducting the row average from each row
@@ -48,8 +51,13 @@ pred = np.dot(np.dot(U, sigma), Vt)
 # add averages back
 pred = pred + avg_ratings.values.reshape(-1, 1)
 
+
+
+
 # Create DataFrame of the results
 pred_df = pd.DataFrame(pred, columns=ratings_table.columns, index=ratings_table.index)
+
+
 
 # example to show user 5 highest rated films
 user_5_ratings = pred_df.loc[1, :].sort_values(ascending=False)
@@ -67,4 +75,8 @@ pred_values = pred_df.iloc[:40, :200].values
 mask = ~np.isnan(actual_values)
 
 # calculating rmse
-print(mean_squared_error(actual_values[mask], pred_values[mask], squared=False))
+# print(f'The root mean square error: {mean_squared_error(actual_values[mask], pred_values[mask], squared=False)}.')
+
+
+
+
