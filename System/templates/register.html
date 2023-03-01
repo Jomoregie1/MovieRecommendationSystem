@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+<section class="vh-100 bg-image"
+  style="background-image: url('https://mdbcdn.b-cdn.net/img/Photos/new-templates/search-box/img4.webp');">
+  <div class="mask d-flex align-items-center h-100 gradient-custom-3">
+    <div class="container h-100">
+      <div class="row d-flex justify-content-center align-items-center h-100" >
+        <div class="col-12 col-md-9 col-lg-7 col-xl-6">
+          <div class="card" style="border-radius: 15px;">
+            <div class="card-body p-5">
+              <h2 class="text-uppercase text-center mb-5">Create an account</h2>
+              <form method="POST">
+                {{ form.csrf_token }}
+                <div class="form-outline mb-4">
+                  <label class="form-label" >{{form.first_name.label}}</label>
+                  {{form.first_name(class="form-control form-control-lg")}}
+                </div>
+                <div class="form-outline mb-4">
+                  <label class="form-label" >{{form.last_name.label}}</label>
+                  {{form.last_name(class="form-control form-control-lg")}}
+                </div>
+                <div>
+                <label class="form-label">{{form.gender.label}}</label>
+                  {% for subfield in form.gender %}
+                    <tr>
+                        <br>
+                        <td>{{ subfield }}</td>
+                        <td>{{ subfield.label }}</td>
+                    </tr>
+                  {% endfor %}
+                </div>
+                <div class="form-outline mb-4">
+                  <label class="form-label" >{{form.age.label}}</label>
+                  {{form.age(class="form-control form-control-lg")}}
+                </div>
+                <div class="form-outline mb-4">
+                  <label class="form-label">{{form.email.label}}</label>
+                  {{form.email(class="form-control form-control-lg")}}
+                </div>
+                <div class="form-outline mb-4">
+                  <label class="form-label">{{form.password.label}}</label>
+                  {{form.password(class="form-control form-control-lg")}}
+                </div>
+                <div class="form-outline mb-4">
+                  <label class="form-label">{{form.pass_confirm.label}}</label>
+                  {{form.pass_confirm(class="form-control form-control-lg")}}
+                </div>
+                <div class="d-flex justify-content-center">
+                  {{form.submit(class="btn btn-success btn-block btn-lg gradient-custom-4 text-body")}}
+                </div>
+
+                <p class="text-center text-muted mt-5 mb-0">Have already an account? <a href="{{url_for('core.login')}}"
+                    class="fw-bold text-body"><u>Login here</u></a></p>
+
+              </form>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
