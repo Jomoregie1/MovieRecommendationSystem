@@ -6,6 +6,7 @@ from flask_login import LoginManager
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 
+
 # login manager instance created
 login_manager = LoginManager()
 
@@ -38,8 +39,9 @@ from System.error_pages.handlers import error_pages
 app.register_blueprint(core)
 app.register_blueprint(error_pages)
 from System.Users.views import user
-
 app.register_blueprint(user)
+from System.Chatbot.views import bot
+app.register_blueprint(bot)
 
 # Connect to the database
 mydb = mysql.connector.connect(

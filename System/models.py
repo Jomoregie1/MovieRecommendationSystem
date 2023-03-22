@@ -53,3 +53,15 @@ with app.app_context():
 
         def check_admin(self, password):
             """Check if provided password matches admin's password."""
+
+
+    class Statement(db.Model):
+        __tablename__ = 'statement'  # Make sure the table name matches your existing table name
+        id = db.Column(db.Integer, primary_key=True)
+        text = db.Column(db.String(500))
+        search_text = db.Column(db.String(500))
+        conversation = db.Column(db.String(100))
+        created_at = db.Column(db.DateTime)
+        in_response_to = db.Column(db.String(500))
+        search_in_response_to = db.Column(db.String(500))
+        persona = db.Column(db.String(100))
