@@ -1,9 +1,10 @@
+import re
 from chatterbot.logic import LogicAdapter
 from chatterbot.storage.sql_storage import SQLStorageAdapter
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from System.RecommendationEngine.recommendationEngine import count_rated_movies_for_user, \
-    recommend_movies_to_rate_for_new_users
+    recommend_movies_to_rate_for_new_users, store_rating
 from chatterbot.conversation import Statement
 from sqlalchemy.sql.expression import text
 from flask_login import current_user
@@ -45,7 +46,9 @@ class CustomSQLStorageAdapter(SQLStorageAdapter):
         session.close()
 
 
-# TODO MAKE SURE THIS WORKS AS EXPECTED!
+# TODO 1 MAKE SURE THIS WORKS AS EXPECTED! - so far main issue with this code is the logic is all wrong, TODO 2 need
+#  to make sure that the conversation can be maintained and on top of that, ensure that previous conversation is
+#  kept, ensure that the current index of the popular list is also maintained
 class UserConversationLogicAdapter(LogicAdapter):
     def __init__(self, chatbot, **kwargs):
         super().__init__(chatbot, **kwargs)
@@ -66,6 +69,7 @@ class UserConversationLogicAdapter(LogicAdapter):
         return True
 
     def process(self, statement, additional_response_selection_parameters=None):
+        response_text = ""
         # Retrieve the user's conversation from storage or create a new one
         user_conversation = self.chatbot.storage.get_conversation(self.user_id)
         if not user_conversation:
@@ -85,23 +89,31 @@ class UserConversationLogicAdapter(LogicAdapter):
         elif not isinstance(metadata, dict):
             metadata = {}
 
-        if message == 'please rate more movies to receive recommendations':
-            metadata['popular_movies'] = popular_movies
-            metadata['current_movie_index'] = metadata.get('current_movie_index', 0)
-            metadata['last_recommendation'] = popular_movies[metadata['current_movie_index']]
+        # Set 'current_movie_index' to 0 if it's not already set
+        if 'current_movie_index' not in metadata:
+            metadata['current_movie_index'] = 0
+
+        if statement.text.strip().lower() == 'no':
             metadata['current_movie_index'] += 1
 
-        last_recommendation = metadata.get('last_recommendation')
+        # Check if the user has provided a rating for the last recommended movie
+        rating_match = re.match(r"(\d)", statement.text.strip())
+        if rating_match and 'last_recommendation' in metadata:
+            rating = int(rating_match.group(1))
+            movie_id = metadata['last_recommendation'][0]
+            if 1 <= rating <= 5:
+                store_rating(self.user_id, movie_id, rating)
+                metadata.pop('last_recommendation', None)
+                metadata['current_movie_index'] += 1
 
-        if last_recommendation is not None:
-            print("Metadata:", metadata)
-            response_text = f"You last rated {last_recommendation}. Here's another movie you might like: {popular_movies[int(metadata['current_movie_index'])]} "
-        else:
-            response_text = f"I don't have any recommendations for you yet. Here's a popular movie: {popular_movies[0]['title']}"
+        if 'last_recommendation' not in metadata and len(popular_movies) > 0:
+            next_movie_id, next_movie_title = popular_movies[int(metadata['current_movie_index'])]
+            response_text = f"Have you watched {next_movie_title}? If yes, please rate it from 1 to 5. If you haven't " \
+                            f"seen it, reply 'no'. "
+            metadata['last_recommendation'] = (next_movie_id, next_movie_title)
+            metadata['current_movie_index'] += 1
 
         response = Statement(text=response_text)
-
-        print(response.text)
 
         # Store metadata back as a JSON string or a MetaData object, depending on your implementation
         if isinstance(metadata, dict):
@@ -219,3 +231,5 @@ class UserConversationLogicAdapter(LogicAdapter):
 #     def update_movie_rating(self, movie, rating):
 #         # Call your database to update the rating for a movie by the current user
 #         # (you'll
+
+

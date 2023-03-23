@@ -352,14 +352,14 @@ import spacy
 #
 # # TODO need to fix this function here and recommend movies to new users.
 def popular_movies_df():
-    query = """SELECT m.title, COUNT(r.ratings) as num_ratings
+    query = """SELECT m.movieId, m.title, COUNT(r.ratings) as num_ratings, AVG(r.ratings) as avg_rating
                FROM movies as m
                INNER JOIN ratings as r ON m.movieId = r.movieId
-               WHERE ratings = 5
-               GROUP BY m.title
-               HAVING num_ratings > 30;"""
+               GROUP BY m.movieId, m.title
+               HAVING num_ratings > 30
+               ORDER BY avg_rating DESC, m.movieId ASC;"""
     popular_movies_df = pd.read_sql_query(query, con=mydb)
-    return popular_movies_df['title'].tolist()
+    return list(zip(popular_movies_df['movieId'], popular_movies_df['title']))
 
 
 def get_rated_movies(user):
@@ -368,7 +368,7 @@ def get_rated_movies(user):
                INNER JOIN movies as m ON r.movieId = m.movieId
                WHERE userId = %s AND ratings > 0;"""
     rated_movies_df = pd.read_sql_query(query, con=mydb, params=[user])
-    return rated_movies_df['title'].tolist()
+    return list(rated_movies_df[['movieId', 'title']].itertuples(index=False, name=None))
 
 
 def recommend_movies_to_rate_for_new_users(user):
@@ -391,6 +391,13 @@ def count_rated_movies_for_user(user):
     count_ratings_df = pd.read_sql_query(query, con=mydb, params=[str(user)])
     num_rated_movies = count_ratings_df.iloc[0][0]
     return num_rated_movies
+
+
+def store_rating(user_id, movie_id, rating):
+    query = "INSERT INTO ratings (userId, movieId, ratings) VALUES (%s, %s, %s)"
+    cursor = mydb.cursor()
+    cursor.execute(query, (user_id, movie_id, rating))
+    mydb.commit()
 
 
 recommend_movies_to_rate_for_new_users(500)
