@@ -42,15 +42,17 @@ def chat():
             conversation = chatbot.storage.create_conversation(user_id)
 
         chatbot_response = None
+        movie_image_url = None
         for adapter in chatbot.logic_adapters:
             if isinstance(adapter, UserConversationLogicAdapter):
                 adapter.set_user_id(user_id)
                 chatbot_response = chatbot.get_response(user_message, additional_response_selection_parameters={
                     'conversation': conversation})
+                movie_image_url = adapter.movie_image_url
                 break
 
         print(f"Chatbot response: {str(chatbot_response)}")  # Add this line
 
-        return jsonify({'status': 'success', 'response': str(chatbot_response)})
+        return jsonify({'status': 'success', 'response': str(chatbot_response), 'movie_image_url': movie_image_url})
 
     return render_template('index.html')

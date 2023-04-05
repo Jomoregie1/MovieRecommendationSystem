@@ -379,9 +379,7 @@ def recommend_movies_to_rate_for_new_users(user):
     movies_to_rate = popular_movies - rated_movies
 
     if len(rated_movies) < 10:
-        return 'please rate more movies to receive recommendations', list(movies_to_rate)
-
-    return list(movies_to_rate)
+        return list(movies_to_rate)
 
 
 # TODO when refractioring add this to other parts of my code
@@ -394,10 +392,12 @@ def count_rated_movies_for_user(user):
 
 
 def store_rating(user_id, movie_id, rating):
+    print(f"Storing rating: user_id={user_id}, movie_id={movie_id}, rating={rating}")
     query = "INSERT INTO ratings (userId, movieId, ratings) VALUES (%s, %s, %s)"
     cursor = mydb.cursor()
     cursor.execute(query, (user_id, movie_id, rating))
     mydb.commit()
+    print("Rating stored successfully")
 
 
 recommend_movies_to_rate_for_new_users(500)

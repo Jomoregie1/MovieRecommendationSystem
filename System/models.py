@@ -1,6 +1,8 @@
 from System import db, login_manager, app
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.dialects.mysql import JSON
+import json
 
 with app.app_context():
     db.Model.metadata.reflect(db.engine)
@@ -65,3 +67,17 @@ with app.app_context():
         in_response_to = db.Column(db.String(500))
         search_in_response_to = db.Column(db.String(500))
         persona = db.Column(db.String(100))
+        meta = db.Column(JSON)
+
+        @property
+        def meta_dict(self):
+            if isinstance(self.meta, str):
+                return json.loads(self.meta)
+            return self.meta or {}
+
+        @meta_dict.setter
+        def meta_dict(self, value):
+            if isinstance(value, dict):
+                self.meta = json.dumps(value)
+            else:
+                self.meta = value
