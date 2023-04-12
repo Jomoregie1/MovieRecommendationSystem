@@ -1,13 +1,15 @@
 from flask import render_template, request, Blueprint, url_for, flash, redirect
 from flask_login import login_user, logout_user
 from System import db
+from System.Chatbot.logicadapter import UserConversationLogicAdapter
+from System.Chatbot.views import chatbot
 from System.models import User, Admin
 from System.Core.forms import LoginForm
 from flask_login import current_user
 
 core = Blueprint('core', __name__)
 
-
+# TODO - FIX THIS AS THERE SHOULD BE ONE ROUTE TO THE HOMEPAGE WHICH '/CHAT'
 @core.route('/')
 def index():
     # checks if the user is logged in, if not returns them to the login page.
@@ -28,6 +30,10 @@ def login():
             user = User.query.filter_by(email=email).first()
             if user is not None and user.check_user(password=form.password.data):
                 login_user(user)
+                for adapter in chatbot.logic_adapters:
+                    if isinstance(adapter, UserConversationLogicAdapter):
+                        adapter.reset_first_interaction()
+                        break
                 flash('Successfully logged in!')
                 return redirect(url_for('core.index'))
             else:

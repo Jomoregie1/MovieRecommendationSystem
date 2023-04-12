@@ -19,11 +19,11 @@ mydb = mysql.connector.connect(
     database="movierecommendation"
 )
 
-item_user_ratings_df = pd.read_sql('SELECT m.movieId,u.userId,r.ratings FROM movies as m JOIN ratings as r ON '
+item_user_ratings_df = pd.read_sql('SELECT m.title,u.userId,r.ratings FROM movies as m JOIN ratings as r ON '
                                    'm.movieId '
                                    '= r.movieId JOIN users as u ON r.userId = u.userId;', con=mydb)
 
-ratings_table = pd.pivot_table(item_user_ratings_df, values='ratings', index=['userId'], columns=['movieId'])
+ratings_table = pd.pivot_table(item_user_ratings_df, values='ratings', index=['userId'], columns=['title'])
 
 # Matrix factorisation
 # Normalising our data (centring our data by deducting the row average from each row)

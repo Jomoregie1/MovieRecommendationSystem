@@ -1,30 +1,91 @@
 from flask import Flask, render_template, request, session, jsonify, Blueprint, make_response
 from flask_login import current_user
 from sqlalchemy.orm import sessionmaker
-
 from System.RecommendationEngine.recommendationEngine import recommend_movies_to_rate_for_new_users
 from chatterbot import ChatBot
 from chatterbot.trainers import ChatterBotCorpusTrainer
 from chatterbot.conversation import Statement
-from System.Chatbot.logicadapter import UserConversationLogicAdapter, CustomSQLStorageAdapter
+from System.Chatbot.logicadapter import UserConversationLogicAdapter, BridgeLogicAdapter, \
+    RecommendMoviesBasedOnUserAdapter, RecommendMovieBasedOnSimilarTitleAdapter, RecommendMovieBasedOnGenreAdapter, \
+    RecommendMoviesBasedOnTagAdapter, RecommendMoviesBasedOnYearAdapter, RecommendMoviesBasedOnYearAndGenreAdapter
 
 bot = Blueprint('chatbot', __name__)
 
 chatbot = ChatBot(
     'Buddy',
-    storage_adapter='System.Chatbot.logicadapter.CustomSQLStorageAdapter',  # Update this line
+    storage_adapter='System.Chatbot.logicadapter.CustomSQLStorageAdapter',
     database_uri='mysql+mysqlconnector://root:root@localhost:3306/chatbot',
     logic_adapters=[
         {
             'import_path': 'System.Chatbot.logicadapter.UserConversationLogicAdapter',
-            'USER_CONVERSATION_LOGIC_ADAPTER': 'System.Chatbot.logicadapter.UserConversationLogicAdapter'
+        },
+        {
+            'import_path': 'System.Chatbot.logicadapter.BridgeLogicAdapter',
+            'recommendation_adapters': [
+                {
+                    'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnYearAndGenreAdapter',
+                },
+                {
+                    'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnTagAdapter',
+                },
+                {
+                    'import_path': 'System.Chatbot.logicadapter.RecommendMovieBasedOnGenreAdapter',
+                },
+                {
+                    'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnYearAdapter',
+                },
+                {
+                    'import_path': 'System.Chatbot.logicadapter.RecommendMovieBasedOnSimilarTitleAdapter',
+                },
+                {
+                    'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnUserAdapter',
+                }
+            ]
         }
     ]
 )
-
 trainer = ChatterBotCorpusTrainer(chatbot)
 trainer.train('chatterbot.corpus.english')
 
+print("Logic Adapters:", chatbot.logic_adapters)
+
+
+def get_response_and_image_url(chatbot, user_message, conversation, user_id):
+    chatbot.set_user_id_for_adapters(user_id)
+
+    chatbot_response = None
+    movie_image_url = None
+    movie_image_url_adapters = (
+        UserConversationLogicAdapter,
+        RecommendMoviesBasedOnYearAndGenreAdapter,
+        RecommendMoviesBasedOnTagAdapter,
+        RecommendMovieBasedOnGenreAdapter,
+        RecommendMoviesBasedOnYearAdapter,
+        RecommendMovieBasedOnSimilarTitleAdapter,
+        RecommendMoviesBasedOnUserAdapter,
+    )
+
+    # Get the response from the chatbot
+    response = chatbot.get_response(user_message, additional_response_selection_parameters={
+        'conversation': conversation})
+
+    for adapter in chatbot.logic_adapters:
+        if isinstance(adapter, UserConversationLogicAdapter):
+            if adapter.movie_image_url is not None:
+                movie_image_url = adapter.movie_image_url
+                print(f"Adapter {type(adapter).__name__} movie_image_url: {movie_image_url}")
+
+        if isinstance(adapter, BridgeLogicAdapter):
+            for recommendation_adapter in adapter.recommendation_adapters:
+                print(f"Checking recommendation adapter {type(recommendation_adapter).__name__}")
+                if type(recommendation_adapter) in movie_image_url_adapters and recommendation_adapter.movie_image_url is not None:
+                    movie_image_url = recommendation_adapter.movie_image_url
+                    print(f"Adapter {type(recommendation_adapter).__name__} movie_image_url: {movie_image_url}")
+
+        if not chatbot_response or response.confidence == 1.0:
+            chatbot_response = response
+
+    return chatbot_response, movie_image_url
 
 @bot.route('/chat', methods=['GET', 'POST'])
 def chat():
@@ -41,17 +102,9 @@ def chat():
         if not conversation:
             conversation = chatbot.storage.create_conversation(user_id)
 
-        chatbot_response = None
-        movie_image_url = None
-        for adapter in chatbot.logic_adapters:
-            if isinstance(adapter, UserConversationLogicAdapter):
-                adapter.set_user_id(user_id)
-                chatbot_response = chatbot.get_response(user_message, additional_response_selection_parameters={
-                    'conversation': conversation})
-                movie_image_url = adapter.movie_image_url
-                break
+        chatbot_response, movie_image_url = get_response_and_image_url(chatbot, user_message, conversation, user_id)
 
-        print(f"Chatbot response: {str(chatbot_response)}")  # Add this line
+        print(f"Chatbot response: {str(chatbot_response)}")
 
         return jsonify({'status': 'success', 'response': str(chatbot_response), 'movie_image_url': movie_image_url})
 

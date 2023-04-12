@@ -1,4 +1,3 @@
-import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
@@ -10,4 +9,5 @@ def image_url(title):
     content = requests.get(url).content
     soup = BeautifulSoup(content, 'lxml')
     images = soup.findAll('img')
+    print(f"Image URL: {images[1].get('src')}")
     return images[1].get('src')
