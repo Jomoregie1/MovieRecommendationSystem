@@ -11,10 +11,6 @@ import spacy
 from rake_nltk import Rake
 import mysql.connector
 
-# TODO 2 - You may want to add error handling to your functions to handle exceptions that may arise during database
-#  connections, queries, or other operations. This will help make your functions more robust and provide better
-#  feedback to the user in case something goes wrong.
-
 db_connection_string = "mysql+mysqlconnector://root:root@localhost:3306/movierecommendation"
 engine = create_engine(db_connection_string)
 nlp = spacy.load("en_core_web_lg")
@@ -25,14 +21,18 @@ def popular_movies_df():
     Returns a list of popular movies based on the number of ratings and average rating.
     :return: list of tuples, each tuple containing movie ID and title
     """
-    query = """SELECT m.movieId, m.title, COUNT(r.ratings) as num_ratings, AVG(r.ratings) as avg_rating
-               FROM movies as m
-               INNER JOIN ratings as r ON m.movieId = r.movieId
-               GROUP BY m.movieId, m.title 
-               HAVING num_ratings > 30
-               ORDER BY avg_rating DESC, m.movieId ASC;"""
-    popular_movies_df = pd.read_sql_query(query, con=mydb)
-    return list(zip(popular_movies_df['movieId'], popular_movies_df['title']))
+    try:
+        query = """SELECT m.movieId, m.title, COUNT(r.ratings) as num_ratings, AVG(r.ratings) as avg_rating
+                   FROM movies as m
+                   INNER JOIN ratings as r ON m.movieId = r.movieId
+                   GROUP BY m.movieId, m.title 
+                   HAVING num_ratings > 30
+                   ORDER BY avg_rating DESC, m.movieId ASC;"""
+        popular_movies_df = pd.read_sql_query(query, con=mydb)
+        return list(zip(popular_movies_df['movieId'], popular_movies_df['title']))
+    except Exception as e:
+        print("Error fetching popular movies:", e)
+        return []
 
 
 def get_rated_movies(user):
@@ -41,13 +41,16 @@ def get_rated_movies(user):
     param user: int, user ID
     :return: list of tuples, each tuple containing movie ID and title
     """
-
-    query = """SELECT r.movieId, m.title
-               FROM ratings as r
-               INNER JOIN movies as m ON r.movieId = m.movieId
-               WHERE userId = %s AND ratings > 0;"""
-    rated_movies_df = pd.read_sql_query(query, con=mydb, params=[user])
-    return list(rated_movies_df[['movieId', 'title']].itertuples(index=False, name=None))
+    try:
+        query = """SELECT r.movieId, m.title
+                   FROM ratings as r
+                   INNER JOIN movies as m ON r.movieId = m.movieId
+                   WHERE userId = %s AND ratings > 0;"""
+        rated_movies_df = pd.read_sql_query(query, con=mydb, params=[user])
+        return list(rated_movies_df[['movieId', 'title']].itertuples(index=False, name=None))
+    except Exception as e:
+        print("Error fetching rated movies:", e)
+        return []
 
 
 def get_movie_titles():
@@ -55,12 +58,16 @@ def get_movie_titles():
     Returns a DataFrame containing movie titles.
     :return: pandas DataFrame, movie titles
     """
-    with engine.connect() as connection:
-        query = text("""SELECT title
-               FROM movies;""")
-        result = connection.execute(query)
-        movie_data = pd.DataFrame(result.fetchall(), columns=['title'])
-        return movie_data
+    try:
+        with engine.connect() as connection:
+            query = text("""SELECT title
+                       FROM movies;""")
+            result = connection.execute(query)
+            movie_data = pd.DataFrame(result.fetchall(), columns=['title'])
+            return movie_data
+    except Exception as e:
+        print("Error fetching movie titles:", e)
+        return pd.DataFrame()
 
 
 def count_rated_movies_for_user(user):
@@ -69,10 +76,14 @@ def count_rated_movies_for_user(user):
     param user: int, user ID
     :return: int, number of rated movies
     """
-    query = "SELECT COUNT(*) FROM ratings WHERE userId = %s"
-    count_ratings_df = pd.read_sql_query(query, con=mydb, params=[str(user)])
-    num_rated_movies = count_ratings_df.iloc[0][0]
-    return num_rated_movies
+    try:
+        query = "SELECT COUNT(*) FROM ratings WHERE userId = %s"
+        count_ratings_df = pd.read_sql_query(query, con=mydb, params=[str(user)])
+        num_rated_movies = count_ratings_df.iloc[0][0]
+        return num_rated_movies
+    except Exception as e:
+        print("Error counting rated movies for user:", e)
+        return 0
 
 
 def store_rating(user_id, movie_id, rating):
@@ -99,16 +110,23 @@ def get_movie_data():
     Returns a DataFrame containing movie data including genres, tags, and description.
     :return: pandas DataFrame, movie data
     """
-    with engine.connect() as connection:
-        query = text("SELECT m.movieId, m.title, GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') AS genres, "
-                     "GROUP_CONCAT(DISTINCT IFNULL(t.tag, 'None') SEPARATOR ', ') AS tags, COALESCE(md.description, "
-                     "'None') AS "
-                     "description FROM movies as m LEFT JOIN movie_genre as mg ON m.movieId = mg.movieId LEFT JOIN "
-                     "genres as g ON mg.genre_id = g.genre_id LEFT JOIN tags as t ON m.movieId = t.movieId LEFT JOIN "
-                     "movie_description as md ON m.movieId = md.movieId GROUP BY m.movieId, m.title, md.description;")
-        result = connection.execute(query)
-        movie_data = pd.DataFrame(result.fetchall(), columns=['movieId', 'title', 'genres', 'tags', 'description'])
-        return movie_data
+    try:
+        with engine.connect() as connection:
+            query = text("SELECT m.movieId, m.title, GROUP_CONCAT(DISTINCT g.name SEPARATOR ', ') AS genres, "
+                         "GROUP_CONCAT(DISTINCT IFNULL(t.tag, 'None') SEPARATOR ', ') AS tags, COALESCE("
+                         "md.description, "
+                         "'None') AS "
+                         "description FROM movies as m LEFT JOIN movie_genre as mg ON m.movieId = mg.movieId LEFT JOIN "
+                         "genres as g ON mg.genre_id = g.genre_id LEFT JOIN tags as t ON m.movieId = t.movieId LEFT "
+                         "JOIN "
+                         "movie_description as md ON m.movieId = md.movieId GROUP BY m.movieId, m.title, "
+                         "md.description;")
+            result = connection.execute(query)
+            movie_data = pd.DataFrame(result.fetchall(), columns=['movieId', 'title', 'genres', 'tags', 'description'])
+            return movie_data
+    except Exception as e:
+        print("Error occurred while fetching movie data:", e)
+        return None
 
 
 def create_movie_features(movie_data):
@@ -162,14 +180,27 @@ def fetch_predicted_ratings():
     Returns a DataFrame of predicted ratings.
     :return: pandas DataFrame, predicted ratings
     """
-    with engine.connect() as connection:
-        query = text('SELECT userId, movieId, ratings FROM pred_ratings')
-        result = connection.execute(query)
-        pred_df = pd.DataFrame(result.fetchall(), columns=['userId', 'movieId', 'ratings'])
-        return pred_df.pivot(index='userId', columns='movieId', values='ratings')
+    try:
+        with engine.connect() as connection:
+            query = text('SELECT userId, movieId, ratings FROM pred_ratings')
+            result = connection.execute(query)
+            pred_df = pd.DataFrame(result.fetchall(), columns=['userId', 'movieId', 'ratings'])
+            return pred_df.pivot(index='userId', columns='movieId', values='ratings')
+    except Exception as e:
+        print("Error occurred while fetching predicted ratings:", e)
+        return None
 
 
 def extract_keyword(description):
+    """
+    Extracts keywords from a given text description using the RAKE (Rapid Automatic Keyword Extraction) algorithm.
+
+    Args:
+        description (str): Text description from which to extract keywords.
+
+    Returns:
+        str: Extracted keyword or an empty string if no keywords are found.
+    """
     r = Rake()
     r.extract_keywords_from_text(description)
     extracted_keywords = r.get_ranked_phrases()
@@ -185,12 +216,17 @@ def fetch_user_ratings(user_id):
         Returns:
             A pandas Series containing the user's ratings for all movies.
         """
-    with engine.connect() as connection:
-        query = text("SELECT movieId, ratings FROM ratings WHERE userId = :user_id;")
-        result = connection.execute(query, {'user_id': user_id})
-        user_ratings_df = pd.DataFrame(result.fetchall(), columns=['movieId', 'ratings'])
-        user_ratings_series = pd.Series(data=user_ratings_df["ratings"].values, index=user_ratings_df["movieId"].values)
-        return user_ratings_series
+    try:
+        with engine.connect() as connection:
+            query = text("SELECT movieId, ratings FROM ratings WHERE userId = :user_id;")
+            result = connection.execute(query, {'user_id': user_id})
+            user_ratings_df = pd.DataFrame(result.fetchall(), columns=['movieId', 'ratings'])
+            user_ratings_series = pd.Series(data=user_ratings_df["ratings"].values,
+                                            index=user_ratings_df["movieId"].values)
+            return user_ratings_series
+    except Exception as e:
+        print("Error occurred while fetching user ratings:", e)
+        return None
 
 
 def find_similar_users(user_id, temp_pred_df):
@@ -227,31 +263,48 @@ def find_similar_users(user_id, temp_pred_df):
 def fetch_top_rated_movies(sim_users):
     """Retrieve a list of top-rated movies for a given set of similar users.
 
-        Args:
-            sim_users (list): A list of user IDs similar to the given user.
+    Args:
+        sim_users (list): A list of user IDs similar to the given user.
 
-        Returns:
-            A list of top-rated movies for the given set of users, sorted by average rating.
-        """
-    similar_users_str = ','.join(str(user) for user in sim_users)
-    with engine.connect() as connection:
-        query = text(
-            "SELECT movieId, AVG(ratings) as avg_rating "
-            "FROM ratings WHERE FIND_IN_SET(userId, :similar_users) "
-            "GROUP BY movieId "
-            "ORDER BY avg_rating DESC"
-        )
-        result = connection.execute(query, {'similar_users': similar_users_str})
-        top_movies = pd.DataFrame(result.fetchall(), columns=['movieId', 'avg_rating'])
+    Returns:
+        A list of top-rated movies for the given set of users, sorted by average rating.
+    """
+    try:
+        # Check if sim_users is a list
+        if not isinstance(sim_users, list):
+            raise ValueError("sim_users must be a list")
 
-        recommended_movies = []
-        for movieId, avg_rating in top_movies[['movieId', 'avg_rating']].values:
-            query = text("SELECT title FROM movies WHERE movieId = :movie_id")
-            result = connection.execute(query, {'movie_id': movieId})
-            movie_title = result.fetchone()[0]
-            recommended_movies.append((movie_title, round(avg_rating, 1)))
+        # Check if sim_users list is not empty
+        if len(sim_users) == 0:
+            raise ValueError("sim_users list must not be empty")
 
-    return recommended_movies
+        # Check if all elements in sim_users list are integers
+        if not all(isinstance(user, int) for user in sim_users):
+            raise ValueError("All elements in sim_users list must be integers")
+
+        similar_users_str = ','.join(str(user) for user in sim_users)
+        with engine.connect() as connection:
+            query = text(
+                "SELECT movieId, AVG(ratings) as avg_rating "
+                "FROM ratings WHERE FIND_IN_SET(userId, :similar_users) "
+                "GROUP BY movieId "
+                "ORDER BY avg_rating DESC"
+            )
+            result = connection.execute(query, {'similar_users': similar_users_str})
+            top_movies = pd.DataFrame(result.fetchall(), columns=['movieId', 'avg_rating'])
+
+            recommended_movies = []
+            for movieId, avg_rating in top_movies[['movieId', 'avg_rating']].values:
+                query = text("SELECT title FROM movies WHERE movieId = :movie_id")
+                result = connection.execute(query, {'movie_id': movieId})
+                movie_title = result.fetchone()[0]
+                recommended_movies.append((movie_title, round(avg_rating, 1)))
+
+        return recommended_movies
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
 
 
 def fetch_item_predicted_ratings():
@@ -313,11 +366,20 @@ def is_sequel(title1, title2):
 
 @functools.lru_cache(maxsize=None)
 def fetch_predicted_ratings_cache():
+    """
+    Fetches predicted ratings from the cache or computes and caches them if not available.
+    :return: pd.DataFrame, a DataFrame containing predicted ratings.
+    """
     return fetch_predicted_ratings()
 
 
 @functools.lru_cache(maxsize=None)
 def fetch_user_ratings_cache(user_id):
+    """
+    Fetches user ratings for a given user ID from the cache or computes and caches them if not available.
+    param user_id: int, user ID for which to fetch the ratings.
+    :return: pd.DataFrame, a DataFrame containing user ratings for the given user ID.
+    """
     return fetch_user_ratings(user_id)
 
 
