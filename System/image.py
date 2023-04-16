@@ -11,3 +11,6 @@ def image_url(title):
     images = soup.findAll('img')
     print(f"Image URL: {images[1].get('src')}")
     return images[1].get('src')
+
+
+
