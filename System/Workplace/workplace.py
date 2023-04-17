@@ -4,13 +4,8 @@ from sklearn.metrics import mean_squared_error
 import numpy as np
 import mysql.connector
 import pandas as pd
-import matplotlib.pyplot as plt
-import spacy
 from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
-
-# # initialising spacy model, this model has word vectors included.
-# nlp = spacy.load('en_core_web_lg')
 
 mydb = mysql.connector.connect(
     host="localhost",
@@ -19,98 +14,84 @@ mydb = mysql.connector.connect(
     database="movierecommendation"
 )
 
-item_user_ratings_df = pd.read_sql('SELECT m.title,u.userId,r.ratings FROM movies as m JOIN ratings as r ON '
-                                   'm.movieId '
-                                   '= r.movieId JOIN users as u ON r.userId = u.userId;', con=mydb)
 
-ratings_table = pd.pivot_table(item_user_ratings_df, values='ratings', index=['userId'], columns=['title'])
-
-# Matrix factorisation
-# Normalising our data (centring our data by deducting the row average from each row)
-avg_ratings = ratings_table.mean(axis=1)
-# we create a pivot table for the centred data and subtracted the mean from the matrix on a row-level.
-ratings_pivot_centred = ratings_table.sub(avg_ratings, axis=0)
-# We then fill in the missing values with 0,making sure our ratings are not affected.
-ratings_pivot_centred.fillna(0, inplace=True)
-# create sparse matrix
-ratings_train_sparse = csr_matrix(ratings_pivot_centred.values)
-# decompose the matrix
-U, sigma, Vt = svds(ratings_train_sparse.toarray(), k=10)
-# convert the sigma into a diagonal matrix
-sigma = np.diag(sigma)
-# calculate the product of U and sigma
-# allows us to get the full utility matrix
-pred_train = np.dot(np.dot(U, sigma), Vt)
-# finding the full utility matrix
-# add averages back
-pred_train = pred_train + avg_ratings.values.reshape(-1, 1)
-
-# create a dataframe for the predicted matrix
-pred_df = pd.DataFrame(pred_train, columns=ratings_table.columns, index=ratings_table.index)
+def create_ratings_table(mydb):
+    item_user_ratings_df = pd.read_sql('SELECT m.title, u.userId, r.ratings FROM movies as m JOIN ratings as r ON '
+                                       'm.movieId '
+                                       '= r.movieId JOIN users as u ON r.userId = u.userId;', con=mydb)
+    return pd.pivot_table(item_user_ratings_df, values='ratings', index=['userId'], columns=['title'])
 
 
+def normalize_data(df):
+    avg_ratings = df.mean(axis=1)
+    df_centred = df.sub(avg_ratings, axis=0)
+    df_centred.fillna(0, inplace=True)
+    return df_centred, avg_ratings
 
 
-
-
-
-# Cross validation
-kfold = KFold(n_splits=10, shuffle=True, random_state=1)
-mse_values = []
-for train, val in kfold.split(ratings_table):
-    # Create train and validation sets
-    ratings_train = ratings_table.iloc[train]
-    ratings_val = ratings_table.iloc[val]
-
-    # Normalise data
-    avg_ratings_train = ratings_train.mean(axis=1)
-    ratings_train_centred = ratings_train.sub(avg_ratings_train, axis=0)
-    ratings_train_centred.fillna(0, inplace=True)
-
-    avg_ratings_val = ratings_val.mean(axis=1)
-    ratings_val_centred = ratings_val.sub(avg_ratings_val, axis=0)
-    ratings_val_centred.fillna(0, inplace=True)
-
-    # Convert to sparse matrices
-    ratings_train_sparse = csr_matrix(ratings_train_centred.values)
-    ratings_val_sparse = csr_matrix(ratings_val_centred.values)
-
-    # Decompose the train matrix
-    U, sigma, Vt = svds(ratings_train_sparse.toarray(), k=10)
+def decompose_matrix(sparse_matrix, k=10):
+    U, sigma, Vt = svds(sparse_matrix.toarray(), k=k)
     sigma = np.diag(sigma)
+    return U, sigma, Vt
 
-    # Calculate the predicted ratings
-    pred_val = np.dot(np.dot(U, sigma), Vt)
-    pred_val = pred_val + avg_ratings_train.values.reshape(-1, 1)
 
-    # Calculate the MSE for the validation set
-    mse = mean_squared_error(ratings_val_sparse.data, pred_val[ratings_val_sparse.nonzero()])
-    mse_values.append(mse)
+def calculate_predicted_matrix(U, sigma, Vt, avg_ratings):
+    pred_matrix = np.dot(np.dot(U, sigma), Vt)
+    pred_matrix = pred_matrix + avg_ratings.values.reshape(-1, 1)
+    return pred_matrix
 
-# Calculate the mean MSE over all folds
-mean_mse = np.mean(mse_values)
-print(f"Mean MSE over 10-fold cross validation: {mean_mse:.4f}")
 
-# Split data into training and test sets
-X_train, X_test = train_test_split(ratings_table, test_size=0.2, random_state=1)
+def create_pred_df(pred_matrix, ratings_table, index):
+    return pd.DataFrame(pred_matrix, columns=ratings_table.columns, index=index)
 
-# Normalise data
-avg_ratings_train = X_train.mean(axis=1)
-X_train_centred = X_train.sub(avg_ratings_train, axis=0)
-X_train_centred.fillna(0, inplace=True)
 
-avg_ratings_test = X_test.mean(axis=1)
-X_test_centred = X_test.sub(avg_ratings_test, axis=0)
-X_test_centred.fillna(0, inplace=True)
+def cross_validate(ratings_table, n_splits=10, k=10, random_state=1):
+    kfold = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    mse_values = []
 
-# Convert to sparse matrices
-ratings_train_sparse = csr_matrix(X_train_centred.values)
-ratings_test_sparse = csr_matrix(X_test_centred.values)
+    for train, val in kfold.split(ratings_table):
+        ratings_train = ratings_table.iloc[train]
+        ratings_val = ratings_table.iloc[val]
 
-# Decompose the train matrix
-U, sigma, Vt = svds(ratings_train_sparse.toarray(), k=10)
-sigma = np.diag(sigma)
+        ratings_train_centred, avg_ratings_train = normalize_data(ratings_train)
+        ratings_val_centred, avg_ratings_val = normalize_data(ratings_val)
 
-# Calculate the predicted ratings
-pred_val = np.dot(np.dot(U, sigma), Vt)
-pred_val = pred_val + avg_ratings_train.values.reshape(-1, 1)
+        ratings_train_sparse = csr_matrix(ratings_train_centred.values)
+        ratings_val_sparse = csr_matrix(ratings_val_centred.values)
+
+        U, sigma, Vt = decompose_matrix(ratings_train_sparse, k=k)
+
+        pred_val = calculate_predicted_matrix(U, sigma, Vt, avg_ratings_train)
+
+        mse = mean_squared_error(ratings_val_sparse.data, pred_val[ratings_val_sparse.nonzero()])
+        mse_values.append(mse)
+
+    mean_mse = np.mean(mse_values)
+    return mean_mse
+
+
+def evaluate_model(ratings_table, test_size=0.2, random_state=1, k=10):
+    X_train, X_test = train_test_split(ratings_table, test_size=test_size, random_state=random_state)
+
+    X_train_centred, avg_ratings_train = normalize_data(X_train)
+    X_test_centred, avg_ratings_test = normalize_data(X_test)
+
+    ratings_train_sparse = csr_matrix(X_train_centred.values)
+    ratings_test_sparse = csr_matrix(X_test_centred.values)
+
+    U, sigma, Vt = decompose_matrix(ratings_train_sparse, k=k)
+
+    pred_val = calculate_predicted_matrix(U, sigma, Vt, avg_ratings_train)
+
+    mse_test = mean_squared_error(ratings_test_sparse.data, pred_val[ratings_test_sparse.nonzero()])
+
+    return pred_val, X_train.index, mse_test
+
+# ratings_table = create_ratings_table(mydb)
+#
+# mean_mse = cross_validate(ratings_table)
+# print(f"Mean MSE over 10-fold cross validation: {mean_mse:.4f}")
+#
+# pred_val, user_index, mse_test = evaluate_model(ratings_table)
+# pred_df = create_pred_df(pred_val, ratings_table, user_index)
+# print(pred_df)

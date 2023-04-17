@@ -87,6 +87,7 @@ def get_response_and_image_url(chatbot, user_message, conversation, user_id):
 
     return chatbot_response, movie_image_url
 
+
 @bot.route('/chat', methods=['GET', 'POST'])
 def chat():
     if request.method == 'POST':

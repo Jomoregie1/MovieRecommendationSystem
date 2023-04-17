@@ -695,9 +695,9 @@ def recommend_movies_to_rate_for_new_users(user):
 
 
 # recommend_movies_to_rate_for_new_users(615)
-print(recommend_movies_based_on_year_and_genre(1990, 'act', 612))
-print(recommend_movies_based_on_tags("black movies", 612))
-print(recommend_movies_based_on_genre('action', 612))
-print(recommend_movies_based_on_year(2007, 612))
-print(recommend_movies_based_on_title('toystory', 612))
-print(recommend_movies_based_on_user(612))
+# print(recommend_movies_based_on_year_and_genre(1990, 'act', 612))
+# print(recommend_movies_based_on_tags("black movies", 612))
+# print(recommend_movies_based_on_genre('action', 612))
+# print(recommend_movies_based_on_year(2007, 612))
+# print(recommend_movies_based_on_title('toystory', 612))
+# print(recommend_movies_based_on_user(612))
