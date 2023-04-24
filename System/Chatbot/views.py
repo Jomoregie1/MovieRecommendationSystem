@@ -21,26 +21,24 @@ chatbot = ChatBot(
         },
         {
             'import_path': 'System.Chatbot.logicadapter.BridgeLogicAdapter',
-            'recommendation_adapters': [
-                {
-                    'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnYearAndGenreAdapter',
-                },
-                {
-                    'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnTagAdapter',
-                },
-                {
-                    'import_path': 'System.Chatbot.logicadapter.RecommendMovieBasedOnGenreAdapter',
-                },
-                {
-                    'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnYearAdapter',
-                },
-                {
-                    'import_path': 'System.Chatbot.logicadapter.RecommendMovieBasedOnSimilarTitleAdapter',
-                },
-                {
-                    'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnUserAdapter',
-                }
-            ]
+        },
+        {
+            'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnYearAndGenreAdapter',
+        },
+        {
+            'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnTagAdapter',
+        },
+        {
+            'import_path': 'System.Chatbot.logicadapter.RecommendMovieBasedOnGenreAdapter',
+        },
+        {
+            'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnYearAdapter',
+        },
+        {
+            'import_path': 'System.Chatbot.logicadapter.RecommendMovieBasedOnSimilarTitleAdapter',
+        },
+        {
+            'import_path': 'System.Chatbot.logicadapter.RecommendMoviesBasedOnUserAdapter',
         }
     ]
 )
@@ -70,17 +68,10 @@ def get_response_and_image_url(chatbot, user_message, conversation, user_id):
         'conversation': conversation})
 
     for adapter in chatbot.logic_adapters:
-        if isinstance(adapter, UserConversationLogicAdapter):
-            if adapter.movie_image_url is not None:
+        if isinstance(adapter, movie_image_url_adapters):
+            if hasattr(adapter, 'movie_image_url') and adapter.movie_image_url is not None:
                 movie_image_url = adapter.movie_image_url
                 print(f"Adapter {type(adapter).__name__} movie_image_url: {movie_image_url}")
-
-        if isinstance(adapter, BridgeLogicAdapter):
-            for recommendation_adapter in adapter.recommendation_adapters:
-                print(f"Checking recommendation adapter {type(recommendation_adapter).__name__}")
-                if type(recommendation_adapter) in movie_image_url_adapters and recommendation_adapter.movie_image_url is not None:
-                    movie_image_url = recommendation_adapter.movie_image_url
-                    print(f"Adapter {type(recommendation_adapter).__name__} movie_image_url: {movie_image_url}")
 
         if not chatbot_response or response.confidence == 1.0:
             chatbot_response = response

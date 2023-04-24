@@ -94,13 +94,24 @@ def store_rating(user_id, movie_id, rating):
     :param rating: float, rating given by the user
     """
     print(f"Storing rating: user_id={user_id}, movie_id={movie_id}, rating={rating}")
-    query = "INSERT INTO ratings (userId, movieId, ratings) VALUES (%s, %s, %s)"
+
+    check_query = "SELECT COUNT(*) FROM ratings WHERE userId = %s AND movieId = %s"
+    insert_query = "INSERT INTO ratings (userId, movieId, ratings) VALUES (%s, %s, %s)"
 
     try:
         with mydb.cursor() as cursor:
-            cursor.execute(query, (user_id, movie_id, rating))
-            mydb.commit()
-            print("Rating stored successfully")
+            cursor.execute(check_query, (user_id, movie_id))
+            count = cursor.fetchone()[0]
+
+            if count > 0:
+                print(f"Error: Movie ID {movie_id} already has a rating for User ID {user_id}")
+                return False
+            else:
+                cursor.execute(insert_query, (user_id, movie_id, rating))
+                mydb.commit()
+                print("Rating stored successfully")
+                return True
+
     except mysql.connector.Error as e:
         print(f"The error '{e}' occurred")
 
@@ -426,6 +437,7 @@ def recommend_movies_based_on_title(title, user):
     movie_data, cosine_sim = compute_similarity_matrices()
 
     titles = movie_data['title'].tolist()
+    movie_ids = movie_data['movieId'].tolist()
 
     # Find the closest matching title using FuzzyWuzzy
     match = process.extractOne(title, titles)
@@ -439,17 +451,23 @@ def recommend_movies_based_on_title(title, user):
     sim_scores = sorted(enumerate(cosine_sim[index_user_likes]), key=lambda x: x[1], reverse=True)[1:]
 
     # Get the movies the user has already seen using the get_rated_movies function
-    seen_movies = set(title for _, title in get_rated_movies(user))
+    seen_movie_ids = set(movie_id for movie_id, _ in get_rated_movies(user))
 
     recommended_movies = []
+    unique_movie_titles = set() # Initialize an empty set for unique movie titles
     for score in sim_scores:
         if len(recommended_movies) >= 3:
             break
         movie_index = score[0]
         movie_title = titles[movie_index]
-        if movie_title not in seen_movies and movie_title not in recommended_movies and movie_title != matched_title and not is_sequel(
-                matched_title, movie_title):
-            recommended_movies.append(movie_title)
+        movie_id = movie_ids[movie_index]
+        if movie_id not in seen_movie_ids and (
+                movie_id, movie_title) not in recommended_movies and movie_title != matched_title and not is_sequel(
+            matched_title,
+            movie_title) and movie_title not in unique_movie_titles:  # Add a condition to check if the title is not
+            # in the set
+            unique_movie_titles.add(movie_title)  # Add the movie title to the set
+            recommended_movies.append((movie_id, movie_title))
 
     return recommended_movies
 
@@ -693,11 +711,10 @@ def recommend_movies_to_rate_for_new_users(user):
     if len(rated_movies) < 10:
         return list(movies_to_rate)
 
-
 # recommend_movies_to_rate_for_new_users(615)
 # print(recommend_movies_based_on_year_and_genre(1990, 'act', 612))
-# print(recommend_movies_based_on_tags("black movies", 612))
+# print(recommend_movies_based_on_tags("mountain", 612))
 # print(recommend_movies_based_on_genre('action', 612))
 # print(recommend_movies_based_on_year(2007, 612))
-# print(recommend_movies_based_on_title('toystory', 612))
-# print(recommend_movies_based_on_user(612))
+# print(recommend_movies_based_on_title('5', 612))
+# print(recommend_movies_based_on_user(618))
