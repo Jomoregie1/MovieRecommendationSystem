@@ -48,6 +48,21 @@ trainer.train('chatterbot.corpus.english')
 print("Logic Adapters:", chatbot.logic_adapters)
 
 
+def reset_adapters(chatbot):
+    for adapter in chatbot.logic_adapters:
+        if hasattr(adapter, 'reset'):
+            adapter.reset()
+
+
+def get_first_matching_adapter(adapters, statement):
+    for adapter in adapters:
+        print(f"Debug: Checking if {adapter.__class__.__name__} can process the statement: {statement}")
+        if adapter.can_process(statement):
+            print(f"Debug: {adapter.__class__.__name__} can process the statement: {statement}")
+            return adapter
+    return None
+
+
 def get_response_and_image_url(chatbot, user_message, conversation, user_id):
     chatbot.set_user_id_for_adapters(user_id)
 
@@ -63,18 +78,23 @@ def get_response_and_image_url(chatbot, user_message, conversation, user_id):
         RecommendMoviesBasedOnUserAdapter,
     )
 
-    # Get the response from the chatbot
-    response = chatbot.get_response(user_message, additional_response_selection_parameters={
-        'conversation': conversation})
+    # Create a Statement object with the user_message
+    statement = Statement(user_message)
 
-    for adapter in chatbot.logic_adapters:
-        if isinstance(adapter, movie_image_url_adapters):
-            if hasattr(adapter, 'movie_image_url') and adapter.movie_image_url is not None:
-                movie_image_url = adapter.movie_image_url
-                print(f"Adapter {type(adapter).__name__} movie_image_url: {movie_image_url}")
+    # Find the first matching adapter
+    matching_adapter = get_first_matching_adapter(chatbot.logic_adapters, statement)
 
-        if not chatbot_response or response.confidence == 1.0:
-            chatbot_response = response
+    if matching_adapter is not None:
+        # Process the statement with the matching adapter
+        response = matching_adapter.process(statement, additional_response_selection_parameters={
+            'conversation': conversation})
+
+        if isinstance(matching_adapter, movie_image_url_adapters):
+            if hasattr(matching_adapter, 'movie_image_url') and matching_adapter.movie_image_url is not None:
+                movie_image_url = matching_adapter.movie_image_url
+                print(f"Adapter {type(matching_adapter).__name__} movie_image_url: {movie_image_url}")
+
+        chatbot_response = response.text
 
     return chatbot_response, movie_image_url
 

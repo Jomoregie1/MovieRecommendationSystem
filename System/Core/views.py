@@ -1,6 +1,7 @@
 from flask import render_template, request, Blueprint, url_for, flash, redirect
 from flask_login import login_user, logout_user
 from System import db
+from System.Chatbot.views import reset_adapters
 from System.Chatbot.logicadapter import UserConversationLogicAdapter
 from System.Chatbot.views import chatbot
 from System.models import User, Admin
@@ -8,6 +9,7 @@ from System.Core.forms import LoginForm
 from flask_login import current_user
 
 core = Blueprint('core', __name__)
+
 
 # TODO - FIX THIS AS THERE SHOULD BE ONE ROUTE TO THE HOMEPAGE WHICH '/CHAT'
 @core.route('/')
@@ -50,6 +52,10 @@ def login():
 
 @core.route('/logout')
 def logout():
+
+    # Reset the state for all the previous adapters before logging out the user
+    reset_adapters(chatbot)
+
     logout_user()
     flash('You have been logged out!')
     return redirect(url_for("core.login"))

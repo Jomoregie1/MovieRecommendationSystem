@@ -1,5 +1,6 @@
 import functools
 import re
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
 from sklearn.neighbors import NearestNeighbors
@@ -32,6 +33,27 @@ def popular_movies_df():
         return list(zip(popular_movies_df['movieId'], popular_movies_df['title']))
     except Exception as e:
         print("Error fetching popular movies:", e)
+        return []
+
+
+def list_of_genres():
+    """
+        Fetches a list of distinct genre names from the 'genres' table in the database,
+        excluding the '(no genres listed)' value.
+
+        Returns:
+            list: A list of strings representing distinct genre names, with the
+            exception of '(no genres listed)'. Returns an empty list if there's an error
+            while fetching the genres.
+    """
+    try:
+        query = """select distinct name from genres;"""
+        genres_df = pd.read_sql_query(query, con=mydb)
+        genres = list(genres_df['name'])
+        filtered_genres = [genre for genre in genres if genre != '(no genres listed)']
+        return filtered_genres
+    except Exception as e:
+        print("Error fetching genres", e)
         return []
 
 
@@ -177,13 +199,19 @@ def get_similar_users(user, temp_pred_df):
     return find_similar_users(user, temp_pred_df)
 
 
-def get_unique_movie_list(movie_ratings_sorted):
+def get_unique_movie_list(movie_ratings_sorted, movieId_to_title):
     """
     Returns a list of movie titles and their ratings, sorted by rating.
-    param movie_ratings_sorted: dict, movie ratings sorted by rating
-    :return: list of tuples, movie titles and ratings
+    param movie_ratings_sorted: pd.Series, movie ratings sorted by rating
+    param movieId_to_title: dict, a dictionary mapping movieId to movie title
+    :return: list of tuples, movieId and movie titles
     """
-    return [(title, rating) for title, rating in movie_ratings_sorted.items()]
+    unique_movie_list = []
+    for movie_title, rating in movie_ratings_sorted.items():
+        movieId = list(movieId_to_title.keys())[list(movieId_to_title.values()).index(movie_title)]
+        unique_movie_list.append((movieId, movie_title))
+
+    return unique_movie_list
 
 
 def fetch_predicted_ratings():
@@ -309,9 +337,9 @@ def fetch_top_rated_movies(sim_users):
                 query = text("SELECT title FROM movies WHERE movieId = :movie_id")
                 result = connection.execute(query, {'movie_id': movieId})
                 movie_title = result.fetchone()[0]
-                recommended_movies.append((movie_title, round(avg_rating, 1)))
+                recommended_movies.append((int(movieId), movie_title, round(avg_rating, 1)))
 
-        return recommended_movies
+        return [(movie_id, movie_title) for movie_id, movie_title, _ in recommended_movies]
 
     except Exception as e:
         print(f"Error: {e}")
@@ -407,17 +435,25 @@ def recommend_movies_based_on_user(user_id):
     pred_df = fetch_predicted_ratings_cache()
     user_ratings = fetch_user_ratings_cache(user_id)
 
-    temp_pred_df = pd.concat([pred_df, pd.DataFrame(user_ratings).T.rename({0: user_id})])
-    temp_pred_df.fillna(0, inplace=True)
+    # Add a new row for the user with all values set to NaN
+    pred_df.loc[user_id] = np.nan
 
-    sim_users = find_similar_users(user_id, temp_pred_df)
+    # Update the user's ratings in the pred_df
+    for movie_id, rating in user_ratings.items():
+        pred_df.loc[user_id, movie_id] = rating
+
+    # Fill NaN values with 0
+    pred_df.fillna(0, inplace=True)
+
+    sim_users = find_similar_users(user_id, pred_df)
     top_rated_movies = fetch_top_rated_movies(sim_users)
 
     # Get the movies the user has already seen using the get_rated_movies function
-    seen_movies = set(title for _, title in get_rated_movies(user_id))
+    seen_movies = set((movie_id, title) for movie_id, title in get_rated_movies(user_id))
 
     # Remove the movies that the user has already seen
-    recommended_movies = [title for title in top_rated_movies if title not in seen_movies]
+    recommended_movies = [(movie_id, title) for movie_id, title in top_rated_movies if
+                          (movie_id, title) not in seen_movies]
 
     return recommended_movies
 
@@ -454,7 +490,7 @@ def recommend_movies_based_on_title(title, user):
     seen_movie_ids = set(movie_id for movie_id, _ in get_rated_movies(user))
 
     recommended_movies = []
-    unique_movie_titles = set() # Initialize an empty set for unique movie titles
+    unique_movie_titles = set()  # Initialize an empty set for unique movie titles
     for score in sim_scores:
         if len(recommended_movies) >= 3:
             break
@@ -520,7 +556,7 @@ def recommend_movies_based_on_genre(genre, user):
     movie_ratings_sorted = genre_movie_ratings.sort_values(ascending=False)
 
     # Create a list of unique movie titles and their corresponding average ratings
-    unique_movie_list = list(movie_ratings_sorted.items())
+    unique_movie_list = get_unique_movie_list(movie_ratings_sorted, movieId_to_title)
 
     return unique_movie_list
 
@@ -537,6 +573,7 @@ def recommend_movies_based_on_year(year, user):
         list: A list of tuples containing the recommended movies and their average predicted rating.
 
     """
+
     pred_df = fetch_predicted_ratings()
     user_ratings = fetch_user_ratings(user)
     temp_pred_df = pd.concat([pred_df, pd.DataFrame(user_ratings).T.rename({0: user})])
@@ -570,7 +607,7 @@ def recommend_movies_based_on_year(year, user):
     movie_ratings_sorted = movies_by_year_ratings.sort_values(ascending=False)
 
     # Create a list of unique movie titles and their corresponding average ratings
-    unique_movie_list = list(movie_ratings_sorted.items())
+    unique_movie_list = get_unique_movie_list(movie_ratings_sorted, movieId_to_title)
 
     return unique_movie_list
 
@@ -626,7 +663,7 @@ def recommend_movies_based_on_tags(phrase, user):
     recommended_movies_df = recommended_movies_df[~recommended_movies_df['title'].isin(users_movies_seen)]
 
     # Convert the DataFrame column to a list
-    recommended_movies = recommended_movies_df['title'].tolist()
+    recommended_movies = list(recommended_movies_df[['movieId', 'title']].itertuples(index=False, name=None))
 
     return recommended_movies
 
@@ -687,7 +724,7 @@ def recommend_movies_based_on_year_and_genre(year, genre, user):
     movie_ratings_sorted = movies_by_year_ratings.sort_values(ascending=False)
 
     # Create a list of unique movie titles and their corresponding average ratings
-    unique_movie_list = get_unique_movie_list(movie_ratings_sorted)
+    unique_movie_list = get_unique_movie_list(movie_ratings_sorted, movieId_to_title)
 
     return unique_movie_list
 
@@ -711,6 +748,7 @@ def recommend_movies_to_rate_for_new_users(user):
     if len(rated_movies) < 10:
         return list(movies_to_rate)
 
+
 # recommend_movies_to_rate_for_new_users(615)
 # print(recommend_movies_based_on_year_and_genre(1990, 'act', 612))
 # print(recommend_movies_based_on_tags("mountain", 612))
@@ -718,3 +756,4 @@ def recommend_movies_to_rate_for_new_users(user):
 # print(recommend_movies_based_on_year(2007, 612))
 # print(recommend_movies_based_on_title('5', 612))
 # print(recommend_movies_based_on_user(618))
+print(list_of_genres())
