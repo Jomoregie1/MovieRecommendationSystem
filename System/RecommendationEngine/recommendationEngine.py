@@ -7,11 +7,12 @@ from sklearn.neighbors import NearestNeighbors
 import pandas as pd
 from sqlalchemy import create_engine, text
 from fuzzywuzzy import process
-from System.Workplace.workplace import mydb
+from System.database import connect_db
 import spacy
 from rake_nltk import Rake
 import mysql.connector
 
+mydb = connect_db()
 db_connection_string = "mysql+mysqlconnector://root:root@localhost:3306/movierecommendation"
 engine = create_engine(db_connection_string)
 nlp = spacy.load("en_core_web_lg")
@@ -547,7 +548,8 @@ def recommend_movies_based_on_genre(genre, user):
     temp_pred_df.columns = temp_pred_df.columns.map(lambda x: movieId_to_title.get(x, x))
 
     # Filter the temp_pred_df DataFrame to only include the ratings from the similar users and selected titles
-    filtered_df = temp_pred_df.loc[sim_users, unseen_titles]
+    valid_titles = [title for title in unseen_titles if title in temp_pred_df.columns]
+    filtered_df = temp_pred_df.loc[sim_users, valid_titles]
 
     # Get the average ratings for the movies in the specified genre based on the ratings of the similar users
     genre_movie_ratings = filtered_df.mean(axis=0).round(2)
@@ -590,7 +592,7 @@ def recommend_movies_based_on_year(year, user):
     seen_movies = set(title for _, title in get_rated_movies(user))
 
     # Remove the movies that the user has already seen
-    unseen_titles = [title for title in movies_by_year['title'].tolist() if title not in seen_movies]
+    unseen_titles = [title for title, movieId in zip(movies_by_year['title'], movies_by_year['movieId']) if movieId not in seen_movies and movieId in temp_pred_df.columns]
 
     # Find the three most similar users
     sim_users = get_similar_users(user, temp_pred_df)
@@ -748,12 +750,3 @@ def recommend_movies_to_rate_for_new_users(user):
     if len(rated_movies) < 10:
         return list(movies_to_rate)
 
-
-# recommend_movies_to_rate_for_new_users(615)
-# print(recommend_movies_based_on_year_and_genre(1990, 'act', 612))
-# print(recommend_movies_based_on_tags("mountain", 612))
-# print(recommend_movies_based_on_genre('action', 612))
-# print(recommend_movies_based_on_year(2007, 612))
-# print(recommend_movies_based_on_title('5', 612))
-# print(recommend_movies_based_on_user(618))
-print(list_of_genres())

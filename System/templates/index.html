@@ -6,19 +6,8 @@
 {% endblock %}
 
 {% block content %}
+
     <br><br>
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <ul class=flashes>
-                {% for message in messages %}
-                    <li>{{ message }}</li>
-                {% endfor %}
-            </ul>
-        {% endif %}
-    {% endwith %}
-    <div class="jumbotron">
-        <h3> Welcome </h3>
-    </div>
     <div id="chat-container">
         <!-- Chat messages will be appended here -->
     </div>

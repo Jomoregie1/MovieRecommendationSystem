@@ -1,13 +1,7 @@
-from flask import Flask, render_template, request, session, jsonify, Blueprint, make_response
+from flask import render_template, request, jsonify, Blueprint
 from flask_login import current_user
-from sqlalchemy.orm import sessionmaker
-from System.RecommendationEngine.recommendationEngine import recommend_movies_to_rate_for_new_users
 from chatterbot import ChatBot
-from chatterbot.trainers import ChatterBotCorpusTrainer
 from chatterbot.conversation import Statement
-from System.Chatbot.logicadapter import UserConversationLogicAdapter, BridgeLogicAdapter, \
-    RecommendMoviesBasedOnUserAdapter, RecommendMovieBasedOnSimilarTitleAdapter, RecommendMovieBasedOnGenreAdapter, \
-    RecommendMoviesBasedOnTagAdapter, RecommendMoviesBasedOnYearAdapter, RecommendMoviesBasedOnYearAndGenreAdapter
 
 bot = Blueprint('chatbot', __name__)
 
@@ -42,8 +36,8 @@ chatbot = ChatBot(
         }
     ]
 )
-trainer = ChatterBotCorpusTrainer(chatbot)
-trainer.train('chatterbot.corpus.english')
+# trainer = ChatterBotCorpusTrainer(chatbot)
+# trainer.train('chatterbot.corpus.english')
 
 print("Logic Adapters:", chatbot.logic_adapters)
 
@@ -64,6 +58,10 @@ def get_first_matching_adapter(adapters, statement):
 
 
 def get_response_and_image_url(chatbot, user_message, conversation, user_id):
+    from System.Chatbot.logicadapter import UserConversationLogicAdapter, \
+        RecommendMoviesBasedOnUserAdapter, RecommendMovieBasedOnSimilarTitleAdapter, RecommendMovieBasedOnGenreAdapter, \
+        RecommendMoviesBasedOnTagAdapter, RecommendMoviesBasedOnYearAdapter, RecommendMoviesBasedOnYearAndGenreAdapter
+
     chatbot.set_user_id_for_adapters(user_id)
 
     chatbot_response = None

@@ -1,24 +1,16 @@
 import re
-from chatterbot import utils
 from chatterbot.logic import LogicAdapter
 from chatterbot.storage.sql_storage import SQLStorageAdapter
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from System.RecommendationEngine.recommendationEngine import count_rated_movies_for_user, \
-    recommend_movies_to_rate_for_new_users, store_rating, recommend_movies_based_on_user, recommend_movies_based_on_tags \
-    , recommend_movies_based_on_year, recommend_movies_based_on_year_and_genre, recommend_movies_based_on_title \
-    , recommend_movies_based_on_genre, list_of_genres
 from chatterbot.conversation import Statement
-from sqlalchemy.sql.expression import text
 from System.models import Statement
 from datetime import datetime
 from System.image import image_url
 import json
+import importlib
 
 
-# TODO Need to fix issue with first adpater to bridge adapter
-# TODO need to finish adapter 6
-# TODO need to finish other adapters
 class CustomSQLStorageAdapter(SQLStorageAdapter):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -69,8 +61,6 @@ class CustomSQLStorageAdapter(SQLStorageAdapter):
         session.close()
 
 
-# TODO major issue with this adapter getting an eror while rating
-# TODO oding testO quite a bit of issues with this one completely during the ratings gives an attribute error and also after 10 movies has been rated has unexpected behaviour
 class UserConversationLogicAdapter(LogicAdapter):
     def __init__(self, chatbot, **kwargs):
         super().__init__(chatbot, **kwargs)
@@ -89,12 +79,20 @@ class UserConversationLogicAdapter(LogicAdapter):
             if isinstance(adapter, BridgeLogicAdapter):
                 adapter.set_activate(activate_status)
 
+    def get_recommendation_engine_function(self, function_name):
+        recommendation_engine = importlib.import_module('System.RecommendationEngine.recommendationEngine')
+        function = getattr(recommendation_engine, function_name)
+        return function
+
     def can_process(self, statement):
         if not self.user_id:
             return False
 
         print(self.user_id)
         print("UserConversation")
+
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
+
         # Check if the user has rated 10 movies
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         if num_rated_movies >= 10:
@@ -103,9 +101,11 @@ class UserConversationLogicAdapter(LogicAdapter):
         return True
 
     def process(self, statement, additional_response_selection_parameters=None):
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
         user_conversation = self.get_or_create_user_conversation()
         self.store_user_input(statement)
-        popular_movies = recommend_movies_to_rate_for_new_users(self.user_id)
+        rate_for_new_users = self.get_recommendation_engine_function('recommend_movies_to_rate_for_new_users')
+        popular_movies = rate_for_new_users(self.user_id)
         meta = self.initialize_meta(user_conversation, popular_movies)
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         meta, invalid_input = self.update_meta_based_on_user_input(meta, statement)
@@ -174,6 +174,7 @@ class UserConversationLogicAdapter(LogicAdapter):
     def update_meta_based_on_user_input(self, meta, statement):
         invalid_input = False
         rating_match = re.match(r"(\d)", statement.text.strip())
+        store_rating = self.get_recommendation_engine_function('store_rating')
         if rating_match and 'last_recommendation' in meta:
             rating = int(rating_match.group(1))
             movie_id = meta['last_recommendation'][0]
@@ -219,7 +220,6 @@ class UserConversationLogicAdapter(LogicAdapter):
         self.chatbot.storage.update_conversation(self.user_id, user_conversation)
 
 
-# TODO still bugs in the process function when a user reaches 10 sometimes does not work as expected!
 class BridgeLogicAdapter(LogicAdapter):
     def __init__(self, chatbot, **kwargs):
         super().__init__(chatbot, **kwargs)
@@ -234,10 +234,17 @@ class BridgeLogicAdapter(LogicAdapter):
             if hasattr(adapter, 'set_user_id') and not isinstance(adapter, BridgeLogicAdapter):
                 adapter.set_user_id(user_id)
 
+    def get_recommendation_engine_function(self, function_name):
+        recommendation_engine = importlib.import_module('System.RecommendationEngine.recommendationEngine')
+        function = getattr(recommendation_engine, function_name)
+        return function
+
     def set_activate(self, activate_status):
         self.activate = activate_status
 
     def can_process(self, statement):
+
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
         num_rated_movies = count_rated_movies_for_user(self.user_id)
 
         if num_rated_movies < 10:
@@ -280,30 +287,13 @@ class BridgeLogicAdapter(LogicAdapter):
 
         return metadata
 
-    # def handle_recommendation_option(self, statement):
-    #     try:
-    #         selected_option = int(statement.text.strip())
-    #         print(f"BridgeLogicAdapter selected_option: {selected_option}")
-    #     except ValueError:
-    #         # User entered something other than a number
-    #         self.invalid_input = True
-    #         return None
-    #
-    #     if 1 <= selected_option <= len(self.recommendation_adapters):
-    #         selected_adapter = self.recommendation_adapters[selected_option - 1]
-    #         print(f"BridgeLogicAdapter selected_adapter: {type(selected_adapter).__name__}")
-    #         if hasattr(selected_adapter, 'can_process') and selected_adapter.can_process(statement):
-    #             response = selected_adapter.process(statement)
-    #             return response
-    #
-    #     return None
-
     def update_metadata_and_conversation(self, user_id, conversation, metadata):
         conversation[0].meta = metadata
         self.chatbot.storage.update_conversation(user_id, conversation)
 
     def process(self, statement, additional_response_selection_parameters=None):
         print(f"Debug: BridgeLogicAdapter process called, statement: {statement.text.strip()}")
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         conversation = self.chatbot.storage.get_conversation(self.user_id)
         metadata = self.reset_meta_data(conversation)
@@ -344,6 +334,7 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
         self.first_interaction = True
         self.year = ''
         self.genre = ''
+        self.next_movie_title = ''
 
     def set_user_id(self, user_id):
         self.user_id = user_id
@@ -352,8 +343,14 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
     def is_active(self):
         return self.active
 
+    def get_recommendation_engine_function(self, function_name):
+        recommendation_engine = importlib.import_module('System.RecommendationEngine.recommendationEngine')
+        function = getattr(recommendation_engine, function_name)
+        return function
+
     def can_process(self, statement):
         bridge_adapter_activate_status = False
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         print(
             f"Debug: RecommendMoviesBasedOnYearAndGenreAdapter can_process called, statement: {statement.text.strip()}, self.active: {self.active}")
@@ -382,6 +379,7 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
         user_conversation = self.get_or_create_user_conversation()
         self.store_user_input(statement)
         meta = self.initialize_meta(user_conversation)
+        store_rating = self.get_recommendation_engine_function('store_rating')
         if len(meta['similar_genre_and_year_meta']['recommended_movies_list']) > 0:
             print(f"DEBUG: WE NEED TO CHECK ACTIVE STATUS: {self.active}")
             recommended_movie = meta['similar_genre_and_year_meta']['recommended_movies_list'][0]
@@ -430,7 +428,8 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
 
             else:
                 response_text = f"Please rate the movie {recommended_movie[1]} between (1-5) before getting more " \
-                                f"recommendations or if you haven't watched the movie yet, 0 to go back to the main " \
+                                f"recommendations or if you haven't watched the movie yet, enter '0' to go back to " \
+                                f"the main " \
                                 f"menu. "
                 self.movie_image_url = image_url(recommended_movie[1])
                 self.first_interaction = False
@@ -447,7 +446,7 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
                                 "I'll be able to suggest some " \
                                 "movies I think you " \
                                 "might enjoy that were " \
-                                "made in that genre "
+                                "made in that genre or enter '0' to go back to the recommendation menu."
                 self.movie_image_url = None
             else:
                 meta = self.initialize_meta(user_conversation)
@@ -492,10 +491,14 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
         meta = self.initialize_meta(user_conversation)
         self.isPromptMessage = True
         self.active = False
+        self.first_interaction = True
+        self.next_movie_title = ''
 
-        if 'similar_genre_meta' in meta:
-            meta['similar_genre_and_year_meta']['movies_list'].clear()
-            meta['similar_genre_and_year_meta']['shown_movie'].clear()
+        if 'similar_genre_and_year_meta' in meta:
+            if meta['similar_genre_and_year_meta']['movies_list'] is not None:
+                meta['similar_genre_and_year_meta']['movies_list'].clear()
+            if meta['similar_genre_and_year_meta']['shown_movie'] is not None:
+                meta['similar_genre_and_year_meta']['shown_movie'].clear()
             meta['similar_genre_and_year_meta']['current_movie_index'] = 0
 
         self.update_user_conversation_meta(user_conversation, meta)
@@ -511,6 +514,8 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
         self.chatbot.storage.update_conversation(self.user_id, user_conversation)
 
     def update_meta_based_on_user_input(self, meta, statement):
+        list_of_genres = self.get_recommendation_engine_function('list_of_genre')
+        recommend_movies_based_on_year_and_genre = self.get_recommendation_engine_function('recommend_movies_based_on_year_and_genre')
         user_response = statement.text.strip().lower()
         genre_list = [genre.lower() for genre in list_of_genres()]
         invalid_input = False
@@ -530,14 +535,20 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
                 self.year = year
                 self.genre = genre
                 recommended_movies = recommend_movies_based_on_year_and_genre(self.year, self.genre, self.user_id)
-                meta['similar_genre_and_year_meta']['movies_list'] = recommended_movies
-                meta['similar_genre_and_year_meta']['current_movie_index'] = 0
+                if len(recommended_movies) == 0:
+                    invalid_input = True
+                    self.year = None
+                    self.genre = None
+                else:
+                    meta['similar_genre_and_year_meta']['movies_list'] = recommended_movies
+                    meta['similar_genre_and_year_meta']['current_movie_index'] = 0
             else:
                 invalid_input = True
                 self.year = None
                 self.genre = None
         elif user_response == 'yes' and len(meta['similar_genre_and_year_meta']['movies_list']) > 0:
-            meta['similar_genre_and_year_meta']['recommended_movies_list'].append(meta['similar_genre_and_year_meta']['shown_movie'])
+            meta['similar_genre_and_year_meta']['recommended_movies_list'].append(
+                meta['similar_genre_and_year_meta']['shown_movie'])
         elif user_response == 'no' and len(meta['similar_genre_and_year_meta']['movies_list']) > 0:
             meta['similar_genre_and_year_meta']['current_movie_index'] += 1
         elif user_response == '0':
@@ -553,7 +564,6 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
 
     def generate_next_movie_recommendation(self, meta, statement, invalid_input=False):
 
-        global next_movie_title
         user_response = statement.text.strip().lower()
 
         print("Meta data in generate_next_movie_recommendation:", meta)
@@ -562,56 +572,59 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
             f"checking if current_movie_index is correct in generate_next_movie_recommendation: {current_movie_index}")
 
         if current_movie_index >= len(meta['similar_genre_and_year_meta']['movies_list']) != 0:
-            response_text = "I'm sorry, I don't have any more similar movie recommendations. Please enter another " \
-                            "movie genre or enter 0 to go back to the recommendation menu."
+            response_text = "I'm sorry, I don't have any more movie recommendations. Please enter another " \
+                            "movie genre and year to get more recommendations or enter '0' to go back to the " \
+                            "recommendation menu. "
             self.movie_image_url = None
             meta['similar_genre_and_year_meta']['current_movie_index'] = 0
 
         else:
             try:
                 if len(meta['similar_genre_and_year_meta']['movies_list']) > 0:
-                    next_movie_title = meta['similar_genre_and_year_meta']['movies_list'][current_movie_index][1]
+                    self.next_movie_title = meta['similar_genre_and_year_meta']['movies_list'][current_movie_index][1]
                     shown_movie = meta['similar_genre_and_year_meta']['movies_list'][current_movie_index]
                     meta['similar_genre_and_year_meta']['shown_movie'] = shown_movie
 
                 # TODO - Test this, see if once you say yes does it allow you to rate the movie then, does it allow
                 #  you to suggest another movie title.
-                if user_response == 'yes':
-                    response_text = 'Awesome, I''m so glad you loved my recommendation! I hope you enjoy watching the ' \
-                                    'movie. ' \
-                                    'Once you''re done watching, you''ll be promoted to rate the movie! Your feedback ' \
-                                    'is ' \
-                                    'valuable and will help me make even better suggestions in the future. '
+                if user_response == 'yes' and len(meta['movies_on_tag_meta']['movies_list']) > 0:
+                    response_text = " Awesome, I''m so glad you loved my recommendation! I hope you enjoy watching the " \
+                                    " movie." \
+                                    "Once you're done watching, you''ll be promoted to rate the movie! Your feedback " \
+                                    " is " \
+                                    " valuable and will help me make even better suggestions in the future. "
                     self.active = False
                     self.movie_image_url = None
                     self.isPromptMessage = True
                 elif invalid_input:
-                    response_text = f"Sorry, I didn't understand that. Please reply with 'yes' or 'no' for {next_movie_title}." \
-                                    f"or 0 to go back to the recommendation menu."
+                    if self.next_movie_title == '':
+                        response_text = f" Please enter a valid genre and year to receive a recommendation or 0 to go " \
+                                        f"back to the recommendation menu. "
+                    else:
+                        response_text = f"Sorry, I didn't understand that. Please reply with 'yes' or 'no' for {self.next_movie_title}." \
+                                        f"or 0 to go back to the recommendation menu."
                     self.movie_image_url = None
 
-                # TODO potentially might need to set first_interaction to TRUE
                 elif user_response == '0':
                     response_text = "Great, I'll take you back to the recommendation menu, hope that is okay?"
                     self.movie_image_url = None
                     self.isPromptMessage = True
                 else:
-                    response_text = f"Based on the genre you provided, I really think you'll enjoy {next_movie_title}." \
+                    response_text = f"Based on the genre you provided, I really think you'll enjoy {self.next_movie_title}. " \
                                     f"Would you like to watch it now, or would you prefer a recommendation for another " \
                                     f"movie that's in a similar genre " \
                                     f"Please let me know by replying with 'yes' if you'd like to watch it, or 'no' if " \
                                     f"you'd like another recommendation or enter 0 to go back to the recommendation " \
                                     f"menu or type another movie title for different suggestions. 😁"
 
-                    self.movie_image_url = image_url(next_movie_title)
+                    self.movie_image_url = image_url(self.next_movie_title)
             except IndexError:
-                response_text = "No movie with a similar genre found. Please try again with another title"
+                response_text = "I'm so sorry but no movie was found. Please try again with another genre and year to " \
+                                "get more recommendations. "
 
         return response_text
 
 
-# TODO to work on the functionality of the adapters first before moving on to the making improvements to the
-#  recommendation system.
 class RecommendMoviesBasedOnTagAdapter(LogicAdapter):
 
     def __init__(self, chatbot, **kwargs):
@@ -622,9 +635,15 @@ class RecommendMoviesBasedOnTagAdapter(LogicAdapter):
         self.isPromptMessage = True
         self.first_interaction = True
         self.tag = ''
+        self.next_movie_title = ''
 
     def set_user_id(self, user_id):
         self.user_id = user_id
+
+    def get_recommendation_engine_function(self, function_name):
+        recommendation_engine = importlib.import_module('System.RecommendationEngine.recommendationEngine')
+        function = getattr(recommendation_engine, function_name)
+        return function
 
     @property
     def is_active(self):
@@ -632,6 +651,7 @@ class RecommendMoviesBasedOnTagAdapter(LogicAdapter):
 
     def can_process(self, statement):
         bridge_adapter_activate_status = False
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         print(
             f"Debug: RecommendMoviesBasedOnTagAdapter can_process called, statement: {statement.text.strip()}, self.active: {self.active}")
@@ -660,6 +680,8 @@ class RecommendMoviesBasedOnTagAdapter(LogicAdapter):
         user_conversation = self.get_or_create_user_conversation()
         self.store_user_input(statement)
         meta = self.initialize_meta(user_conversation)
+        store_rating = self.get_recommendation_engine_function('store_rating')
+        recommend_movies_based_on_tags = self.get_recommendation_engine_function('recommend_movies_based_on_tags')
         if len(meta['movies_on_tag_meta']['recommended_movies_list']) > 0:
             print(f"DEBUG: WE NEED TO CHECK ACTIVE STATUS: {self.active}")
             recommended_movie = meta['movies_on_tag_meta']['recommended_movies_list'][0]
@@ -718,8 +740,9 @@ class RecommendMoviesBasedOnTagAdapter(LogicAdapter):
             print(f"DEBUG: What is isPromptMessage value {self.isPromptMessage}")
             if self.isPromptMessage:
                 self.isPromptMessage = False
-                response_text = "Please enter a descriptive word , and I'll suggest some movies I think you might " \
-                                "enjoy.🤞 "
+                response_text = "Please enter a descriptive word or short phrase,and I'll suggest some movies I think " \
+                                "you might " \
+                                "enjoy or enter '0' to go back to the recommendation menu.🤞 "
                 self.movie_image_url = None
             else:
                 self.tag = statement.text.strip()
@@ -746,10 +769,14 @@ class RecommendMoviesBasedOnTagAdapter(LogicAdapter):
         meta = self.initialize_meta(user_conversation)
         self.isPromptMessage = True
         self.active = False
+        self.first_interaction = True
+        self.next_movie_title = ''
 
         if 'movies_on_tag_meta' in meta:
-            meta['movies_on_tag_meta']['movies_list'].clear()
-            meta['movies_on_tag_meta']['shown_movie'].clear()
+            if meta['movies_on_tag_meta']['movies_list'] is not None:
+                meta['movies_on_tag_meta']['movies_list'].clear()
+            if meta['movies_on_tag_meta']['shown_movie'] is not None:
+                meta['movies_on_tag_meta']['shown_movie'].clear()
             meta['movies_on_tag_meta']['current_movie_index'] = 0
 
         self.update_user_conversation_meta(user_conversation, meta)
@@ -799,8 +826,7 @@ class RecommendMoviesBasedOnTagAdapter(LogicAdapter):
             self.active = False
             meta['movies_on_tag_meta']['movies_list'].clear()
             meta['movies_on_tag_meta']['shown_movie'].clear()
-        # TODO issue with this part of code as it does not allow me to enter an invalid input it simply never reaches
-        #  the else statement BIG PROBLEM!
+
         else:
             meta['movies_on_tag_meta']['movies_list'] = recommended_movies
             meta['movies_on_tag_meta']['current_movie_index'] = 0
@@ -810,7 +836,6 @@ class RecommendMoviesBasedOnTagAdapter(LogicAdapter):
 
     def generate_next_movie_recommendation(self, meta, statement, invalid_input=False):
 
-        global next_movie_title
         user_response = statement.text.strip().lower()
 
         print("Meta data in generate_next_movie_recommendation:", meta)
@@ -820,42 +845,45 @@ class RecommendMoviesBasedOnTagAdapter(LogicAdapter):
 
         if current_movie_index >= len(meta['movies_on_tag_meta']['movies_list']) != 0:
             response_text = "I'm sorry, I don't have any more similar movie recommendations. Please enter another " \
-                            "descriptive word or enter 0 to go back to the recommendation menu."
+                            "descriptive word/short phrase or enter 0 to go back to the recommendation menu."
             self.movie_image_url = None
             meta['movies_on_tag_meta']['current_movie_index'] = 0
 
         else:
             try:
                 if len(meta['movies_on_tag_meta']['movies_list']) > 0:
-                    next_movie_title = meta['movies_on_tag_meta']['movies_list'][current_movie_index][1]
+                    self.next_movie_title = meta['movies_on_tag_meta']['movies_list'][current_movie_index][1]
                     shown_movie = meta['movies_on_tag_meta']['movies_list'][current_movie_index]
                     meta['movies_on_tag_meta']['shown_movie'] = shown_movie
 
-                # TODO - Test this, see if once you say yes does it allow you to rate the movie then, does it allow
-                #  you to suggest another movie title.
-                if user_response == 'yes':
-                    response_text = 'Awesome, I''m so glad you loved my recommendation! I hope you enjoy watching the ' \
-                                    'movie. ' \
-                                    'Once you''re done watching, you''ll be promoted to rate the movie! Your feedback ' \
-                                    'is ' \
-                                    'valuable and will help me make even better suggestions in the future. '
+                if user_response == 'yes' and len(meta['movies_on_tag_meta']['movies_list']) > 0:
+                    response_text = " Awesome, I'm so glad you loved my recommendation! I hope you enjoy watching the " \
+                                    " movie." \
+                                    "Once you're done watching, you'll be promoted to rate the movie! Your feedback " \
+                                    " is " \
+                                    " valuable and will help me make even better suggestions in the future. "
                     self.active = False
                     self.movie_image_url = None
                     self.isPromptMessage = True
-                # TODO potentially might need to set first_interaction to TRUE
                 elif user_response == '0':
-                    response_text = "Great, I'll take you back to the recommendation menu, hope that is okay?"
+                    response_text = "Great, I'll take you back to the recommendation menu, hope that's okay?"
                     self.movie_image_url = None
                     self.isPromptMessage = True
+
+                elif self.next_movie_title == '':
+                    response_text = f"Oops we couldn't find anything 😔 , please try again with another descriptive " \
+                                    f"word. "
+                    self.movie_image_url = None
+
                 else:
-                    response_text = f"Based on the word you provided, I really think you'll enjoy {next_movie_title}." \
+                    response_text = f"Based on the word/phrase you provided, I really think you'll enjoy {self.next_movie_title}." \
                                     f"Would you like to watch it now, or would you prefer a recommendation for another " \
                                     f"movie that's similar to the word provided? " \
                                     f"Please let me know by replying with 'yes' if you'd like to watch it, or 'no' if " \
                                     f"you'd like another recommendation or enter 0 to go back to the recommendation " \
                                     f"menu or type another descriptive word for different suggestions. 😁"
 
-                    self.movie_image_url = image_url(next_movie_title)
+                    self.movie_image_url = image_url(self.next_movie_title)
             except IndexError:
                 response_text = "No movie with a similar word found. Please try again with another descriptive word."
 
@@ -872,9 +900,15 @@ class RecommendMovieBasedOnGenreAdapter(LogicAdapter):
         self.isPromptMessage = True
         self.first_interaction = True
         self.genre = ''
+        self.next_movie_title = ''
 
     def set_user_id(self, user_id):
         self.user_id = user_id
+
+    def get_recommendation_engine_function(self, function_name):
+        recommendation_engine = importlib.import_module('System.RecommendationEngine.recommendationEngine')
+        function = getattr(recommendation_engine, function_name)
+        return function
 
     @property
     def is_active(self):
@@ -882,6 +916,7 @@ class RecommendMovieBasedOnGenreAdapter(LogicAdapter):
 
     def can_process(self, statement):
         bridge_adapter_activate_status = False
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         print(
             f"Debug: RecommendMovieBasedOnGenreAdapter can_process called, statement: {statement.text.strip()}, self.active: {self.active}")
@@ -910,6 +945,7 @@ class RecommendMovieBasedOnGenreAdapter(LogicAdapter):
         user_conversation = self.get_or_create_user_conversation()
         self.store_user_input(statement)
         meta = self.initialize_meta(user_conversation)
+        store_rating = self.get_recommendation_engine_function('store_rating')
         if len(meta['similar_genre_meta']['recommended_movies_list']) > 0:
             print(f"DEBUG: WE NEED TO CHECK ACTIVE STATUS: {self.active}")
             recommended_movie = meta['similar_genre_meta']['recommended_movies_list'][0]
@@ -1018,10 +1054,14 @@ class RecommendMovieBasedOnGenreAdapter(LogicAdapter):
         meta = self.initialize_meta(user_conversation)
         self.isPromptMessage = True
         self.active = False
+        self.first_interaction = True
+        self.next_movie_title = ''
 
         if 'similar_genre_meta' in meta:
-            meta['similar_genre_meta']['movies_list'].clear()
-            meta['similar_genre_meta']['shown_movie'].clear()
+            if meta['similar_genre_meta']['movies_list'] is not None:
+                meta['similar_genre_meta']['movies_list'].clear()
+            if meta['similar_genre_meta']['shown_movie'] is not None:
+                meta['similar_genre_meta']['shown_movie'].clear()
             meta['similar_genre_meta']['current_movie_index'] = 0
 
         self.update_user_conversation_meta(user_conversation, meta)
@@ -1037,12 +1077,20 @@ class RecommendMovieBasedOnGenreAdapter(LogicAdapter):
         self.chatbot.storage.update_conversation(self.user_id, user_conversation)
 
     def update_meta_based_on_user_input(self, meta, statement):
+        recommend_movies_based_on_genre = self.get_recommendation_engine_function('recommend_movies_based_on_genre')
+        list_of_genres = self.get_recommendation_engine_function('list_of_genre')
         user_response = statement.text.strip().lower()
-        genre = [genre.lower() for genre in list_of_genres()]
+        genre_list = [genre.lower() for genre in list_of_genres()]
         invalid_input = False
+        genre = None
 
-        if user_response in genre:
-            self.genre = user_response
+        for g in genre_list:
+            if g in user_response:
+                genre = g
+                break
+
+        if genre:
+            self.genre = genre
             recommended_movies = recommend_movies_based_on_genre(self.genre, self.user_id)
             meta['similar_genre_meta']['movies_list'] = recommended_movies
             meta['similar_genre_meta']['current_movie_index'] = 0
@@ -1057,13 +1105,13 @@ class RecommendMovieBasedOnGenreAdapter(LogicAdapter):
             meta['similar_genre_meta']['current_movie_index'] = 0
         else:
             invalid_input = True
+            self.genre = None
 
         print(f"Update meta based on user input {print(meta)}")
         return meta, invalid_input
 
     def generate_next_movie_recommendation(self, meta, statement, invalid_input=False):
 
-        global next_movie_title
         user_response = statement.text.strip().lower()
 
         print("Meta data in generate_next_movie_recommendation:", meta)
@@ -1080,40 +1128,42 @@ class RecommendMovieBasedOnGenreAdapter(LogicAdapter):
         else:
             try:
                 if len(meta['similar_genre_meta']['movies_list']) > 0:
-                    next_movie_title = meta['similar_genre_meta']['movies_list'][current_movie_index][1]
+                    self.next_movie_title = meta['similar_genre_meta']['movies_list'][current_movie_index][1]
                     shown_movie = meta['similar_genre_meta']['movies_list'][current_movie_index]
                     meta['similar_genre_meta']['shown_movie'] = shown_movie
 
-                # TODO - Test this, see if once you say yes does it allow you to rate the movie then, does it allow
-                #  you to suggest another movie title.
-                if user_response == 'yes':
-                    response_text = 'Awesome, I''m so glad you loved my recommendation! I hope you enjoy watching the ' \
-                                    'movie. ' \
-                                    'Once you''re done watching, you''ll be promoted to rate the movie! Your feedback ' \
-                                    'is ' \
-                                    'valuable and will help me make even better suggestions in the future. '
+                if user_response == 'yes' and len(meta['similar_genre_meta']['movies_list']) > 0:
+                    response_text = " Awesome, I'm so glad you loved my recommendation! I hope you enjoy watching the " \
+                                    " movie." \
+                                    "Once you're done watching, you'll be promoted to rate the movie! Your feedback " \
+                                    " is " \
+                                    " valuable and will help me make even better suggestions in the future. "
                     self.active = False
                     self.movie_image_url = None
                     self.isPromptMessage = True
                 elif invalid_input:
-                    response_text = f"Sorry, I didn't understand that. Please reply with 'yes' or 'no' for {next_movie_title}." \
-                                    f"or 0 to go back to the recommendation menu."
+                    if self.next_movie_title == '':
+                        response_text = f" Please enter a valid genre to receive a recommendation or 0 to go " \
+                                        f"back to the recommendation menu. "
+                    else:
+                        response_text = f"Sorry, I didn't understand that. Please reply with 'yes' or 'no' for {self.next_movie_title}" \
+                                        f"or 0 to go back to the recommendation menu."
                     self.movie_image_url = None
 
-                # TODO potentially might need to set first_interaction to TRUE
                 elif user_response == '0':
                     response_text = "Great, I'll take you back to the recommendation menu, hope that is okay?"
                     self.movie_image_url = None
                     self.isPromptMessage = True
+                    self.next_movie_title = ''
                 else:
-                    response_text = f"Based on the genre you provided, I really think you'll enjoy {next_movie_title}." \
+                    response_text = f"Based on the genre you provided, I really think you'll enjoy {self.next_movie_title}." \
                                     f"Would you like to watch it now, or would you prefer a recommendation for another " \
                                     f"movie that's in a similar genre " \
                                     f"Please let me know by replying with 'yes' if you'd like to watch it, or 'no' if " \
                                     f"you'd like another recommendation or enter 0 to go back to the recommendation " \
-                                    f"menu or type another movie title for different suggestions. 😁"
+                                    f"menu or type another movie genre for different suggestions. 😁"
 
-                    self.movie_image_url = image_url(next_movie_title)
+                    self.movie_image_url = image_url(self.next_movie_title)
             except IndexError:
                 response_text = "No movie with a similar genre found. Please try again with another title"
 
@@ -1130,9 +1180,15 @@ class RecommendMoviesBasedOnYearAdapter(LogicAdapter):
         self.isPromptMessage = True
         self.first_interaction = True
         self.year = 0
+        self.next_movie_title = ''
 
     def set_user_id(self, user_id):
         self.user_id = user_id
+
+    def get_recommendation_engine_function(self, function_name):
+        recommendation_engine = importlib.import_module('System.RecommendationEngine.recommendationEngine')
+        function = getattr(recommendation_engine, function_name)
+        return function
 
     @property
     def is_active(self):
@@ -1140,6 +1196,7 @@ class RecommendMoviesBasedOnYearAdapter(LogicAdapter):
 
     def can_process(self, statement):
         bridge_adapter_activate_status = False
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         print(
             f"Debug: RecommendMoviesBasedOnYearAdapter can_process called, statement: {statement.text.strip()}, self.active: {self.active}")
@@ -1161,7 +1218,6 @@ class RecommendMoviesBasedOnYearAdapter(LogicAdapter):
         print("After the check to see if the input is equal to 4 ")
         return False
 
-    # TODO once a movie has been rated, if the user has logged out and atemptes to rate the movie again once they enter the adapter the movie is processed.
     def process(self, statement, additional_response_selection_parameters=None):
         print(
             f"Debug: RecommendMovieBasedOnSimilarTitleAdapter process called, statement: {statement.text.strip()}, "
@@ -1169,8 +1225,10 @@ class RecommendMoviesBasedOnYearAdapter(LogicAdapter):
         user_conversation = self.get_or_create_user_conversation()
         self.store_user_input(statement)
         meta = self.initialize_meta(user_conversation)
+        store_rating = self.get_recommendation_engine_function('store_rating')
         if len(meta['similar_year_meta']['recommended_movies_list']) > 0:
             print(f"DEBUG: WE NEED TO CHECK ACTIVE STATUS: {self.active}")
+            print(f"DEBUG: WE NEED TO CHECK first_interactions status: {self.first_interaction}")
             recommended_movie = meta['similar_year_meta']['recommended_movies_list'][0]
             # Check if the user has provided a rating for the movie
             user_rating = statement.text.strip()
@@ -1229,7 +1287,7 @@ class RecommendMoviesBasedOnYearAdapter(LogicAdapter):
                 self.isPromptMessage = False
                 response_text = "Please enter any year from (1902 - 2018) and I'll suggest some movies I think you " \
                                 "might enjoy that were " \
-                                "made in that year! "
+                                "made in that year! or enter 0 to go back to the recommendation menu. "
                 self.movie_image_url = None
             else:
                 meta = self.initialize_meta(user_conversation)
@@ -1274,10 +1332,13 @@ class RecommendMoviesBasedOnYearAdapter(LogicAdapter):
         meta = self.initialize_meta(user_conversation)
         self.isPromptMessage = True
         self.active = False
+        self.first_interaction = True
 
         if 'similar_year_meta' in meta:
-            meta['similar_year_meta']['movies_list'].clear()
-            meta['similar_year_meta']['shown_movie'].clear()
+            if meta['similar_year_meta']['movies_list'] is not None:
+                meta['similar_year_meta']['movies_list'].clear()
+            if meta['similar_year_meta']['shown_movie'] is not None:
+                meta['similar_year_meta']['shown_movie'].clear()
             meta['similar_year_meta']['current_movie_index'] = 0
 
         self.update_user_conversation_meta(user_conversation, meta)
@@ -1293,14 +1354,28 @@ class RecommendMoviesBasedOnYearAdapter(LogicAdapter):
         self.chatbot.storage.update_conversation(self.user_id, user_conversation)
 
     def update_meta_based_on_user_input(self, meta, statement):
+        recommend_movies_based_on_year = self.get_recommendation_engine_function('recommend_movies_based_on_year')
         user_response = statement.text.strip().lower()
         invalid_input = False
 
-        if user_response.isdigit() and 1902 <= int(user_response) <= 2018:
-            self.year = int(user_response)
-            recommended_movies = recommend_movies_based_on_year(self.year, self.user_id)
-            meta['similar_year_meta']['movies_list'] = recommended_movies
-            meta['similar_year_meta']['current_movie_index'] = 0
+        year_pattern = r'\d{4}'
+        year_match = re.search(year_pattern, user_response)
+        year = int(year_match.group()) if year_match else None
+
+        print(f"Year is : {year}")
+
+        if year:
+            if 1902 <= year <= 2018:
+                self.year = year
+                recommended_movies = recommend_movies_based_on_year(self.year, self.user_id)
+                print(print(f"Recommended_movies is: {recommended_movies}"))
+                if len(recommended_movies) == 0:
+                    invalid_input = True
+                else:
+                    meta['similar_year_meta']['movies_list'] = recommended_movies
+                    meta['similar_year_meta']['current_movie_index'] = 0
+            else:
+                invalid_input = True
         elif user_response == 'yes' and len(meta['similar_year_meta']['movies_list']) > 0:
             meta['similar_year_meta']['recommended_movies_list'].append(meta['similar_year_meta']['shown_movie'])
         elif user_response == 'no' and len(meta['similar_year_meta']['movies_list']) > 0:
@@ -1318,7 +1393,6 @@ class RecommendMoviesBasedOnYearAdapter(LogicAdapter):
 
     def generate_next_movie_recommendation(self, meta, statement, invalid_input=False):
 
-        global next_movie_title
         user_response = statement.text.strip().lower()
 
         print("Meta data in generate_next_movie_recommendation:", meta)
@@ -1327,56 +1401,55 @@ class RecommendMoviesBasedOnYearAdapter(LogicAdapter):
             f"checking if current_movie_index is correct in generate_next_movie_recommendation: {current_movie_index}")
 
         if current_movie_index >= len(meta['similar_year_meta']['movies_list']) != 0:
-            response_text = "I'm sorry, I don't have any more similar movie recommendations. Please enter another " \
-                            "movie title or enter 0 to go back to the recommendation menu."
+            response_text = "I'm sorry, I don't have any more movies to recommend. Please enter another " \
+                            "year or enter 0 to go back to the recommendation menu."
             self.movie_image_url = None
             meta['similar_year_meta']['current_movie_index'] = 0
 
         else:
             try:
                 if len(meta['similar_year_meta']['movies_list']) > 0:
-                    next_movie_title = meta['similar_year_meta']['movies_list'][current_movie_index][1]
+                    self.next_movie_title = meta['similar_year_meta']['movies_list'][current_movie_index][1]
                     shown_movie = meta['similar_year_meta']['movies_list'][current_movie_index]
                     meta['similar_year_meta']['shown_movie'] = shown_movie
 
-                # TODO - Test this, see if once you say yes does it allow you to rate the movie then, does it allow
-                #  you to suggest another movie title.
-                if user_response == 'yes':
-                    response_text = 'Awesome, I''m so glad you loved my recommendation! I hope you enjoy watching the ' \
-                                    'movie. ' \
-                                    'Once you''re done watching, you''ll be promoted to rate the movie! Your feedback ' \
-                                    'is ' \
-                                    'valuable and will help me make even better suggestions in the future. '
+                if user_response == 'yes' and len(meta['similar_year_meta']['movies_list']) > 0:
+                    response_text = " Awesome, I'm so glad you loved my recommendation! I hope you enjoy watching the " \
+                                    " movie." \
+                                    "Once you're done watching, you'll be promoted to rate the movie! Your feedback " \
+                                    " is " \
+                                    " valuable and will help me make even better suggestions in the future. "
+                    print(f"Printing first interaction: {self.first_interaction}")
                     self.active = False
                     self.movie_image_url = None
                     self.isPromptMessage = True
                 elif invalid_input:
-                    response_text = f"Sorry, I didn't understand that. Please reply with 'yes' or 'no' for {next_movie_title}." \
-                                    f"or 0 to go back to the recommendation menu."
+                    if self.next_movie_title == '':
+                        response_text = "Please enter a valid year to receive a recommendation or 0 to go " \
+                                        "back to the recommendation menu. This could have happened due to wrong year " \
+                                        "entry or no movies where found for the year entered. "
+                    else:
+                        response_text = f"Sorry, I didn't understand that. Please reply with 'yes' or 'no' for {self.next_movie_title}" \
+                                        f" or 0 to go back to the recommendation menu."
                     self.movie_image_url = None
 
-                # TODO potentially might need to set first_interaction to TRUE
                 elif user_response == '0':
                     response_text = "Great, I'll take you back to the recommendation menu, hope that is okay?"
                     self.movie_image_url = None
                     self.isPromptMessage = True
+                    self.next_movie_title = ''
                 else:
-                    response_text = f"Based on the title you provided, I really think you'll enjoy {next_movie_title}." \
+                    response_text = f"Based on the year you provided, I really think you'll enjoy {self.next_movie_title}." \
                                     f"Would you like to watch it now, or would you prefer a recommendation for another " \
-                                    f"movie that's similar to the title provided? " \
+                                    f"movie that's in a similar year " \
                                     f"Please let me know by replying with 'yes' if you'd like to watch it, or 'no' if " \
                                     f"you'd like another recommendation or enter 0 to go back to the recommendation " \
-                                    f"menu or type another movie title for different suggestions. 😁"
-
-                    self.movie_image_url = image_url(next_movie_title)
+                                    f"menu or type another year for different suggestions. 😁"
+                    self.movie_image_url = image_url(self.next_movie_title)
             except IndexError:
-                response_text = "No movie with a similar title found. Please try again with another title"
+                response_text = "No movie found. Please try again with another year."
 
         return response_text
-
-
-# TODO when I type 0 it changes the recommend movies list, it now does take me back to the recommendation list. However an it does not prompt me to enter title and the movie changes!
-# TODO issue includes control flow, after I have rated a movie, I should be allowed to rate another movie straight away,but I am unable too as once I supply a title it takes me back to the menu. However this works after a rating has been accepted.
 
 
 class RecommendMovieBasedOnSimilarTitleAdapter(LogicAdapter):
@@ -1389,12 +1462,19 @@ class RecommendMovieBasedOnSimilarTitleAdapter(LogicAdapter):
         self.isPromptMessage = True
         self.active = False
         self.title = ''
+        self.next_movie_title = ''
 
     def set_user_id(self, user_id):
         self.user_id = user_id
 
+    def get_recommendation_engine_function(self, function_name):
+        recommendation_engine = importlib.import_module('System.RecommendationEngine.recommendationEngine')
+        function = getattr(recommendation_engine, function_name)
+        return function
+
     def can_process(self, statement):
         bridge_adapter_activate_status = False
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         print(
             f"Debug: RecommendMovieBasedOnSimilarTitleAdapter can_process called, statement: {statement.text.strip()}, self.active: {self.active}")
@@ -1423,6 +1503,7 @@ class RecommendMovieBasedOnSimilarTitleAdapter(LogicAdapter):
         user_conversation = self.get_or_create_user_conversation()
         self.store_user_input(statement)
         meta = self.initialize_meta(user_conversation)
+        store_rating = self.get_recommendation_engine_function('store_rating')
         if len(meta['similar_title_meta']['recommended_movies_list']) > 0:
             print(f"DEBUG: WE NEED TO CHECK ACTIVE STATUS: {self.active}")
             recommended_movie = meta['similar_title_meta']['recommended_movies_list'][0]
@@ -1481,15 +1562,13 @@ class RecommendMovieBasedOnSimilarTitleAdapter(LogicAdapter):
             print(f"DEBUG: What is isPromptMessage value {self.isPromptMessage}")
             if self.isPromptMessage:
                 self.isPromptMessage = False
-                response_text = "Please enter a movie title, and I'll suggest some similar movies you might enjoy."
+                response_text = "Please enter a movie title, and I'll suggest some similar movies you might enjoy or " \
+                                "enter '0' to return to the recommendation menu. "
                 self.movie_image_url = None
             else:
-                self.title = statement.text.strip()
-                print(f"This is a test for self.title: {self.title}")
-                recommended_movies = recommend_movies_based_on_title(self.title, self.user_id)
-                print(f"The recommended movies list: {recommended_movies}")
+
                 meta = self.initialize_meta(user_conversation)
-                meta, invalid_input = self.update_meta_based_on_user_input(meta, statement, recommended_movies)
+                meta, invalid_input = self.update_meta_based_on_user_input(meta, statement)
 
                 print(
                     f"This is meta after the update_meta function, showing meta: {meta} and the invalid_input: {invalid_input}")
@@ -1508,10 +1587,13 @@ class RecommendMovieBasedOnSimilarTitleAdapter(LogicAdapter):
         meta = self.initialize_meta(user_conversation)
         self.isPromptMessage = True
         self.active = False
+        self.first_interaction = True
 
         if 'similar_title_meta' in meta:
-            meta['similar_title_meta']['movies_list'].clear()
-            meta['similar_title_meta']['shown_movie'].clear()
+            if meta['similar_title_meta']['movies_list'] is not None:
+                meta['similar_title_meta']['movies_list'].clear()
+            if meta['similar_title_meta']['shown_movie'] is not None:
+                meta['similar_title_meta']['shown_movie'].clear()
             meta['similar_title_meta']['current_movie_index'] = 0
 
         self.update_user_conversation_meta(user_conversation, meta)
@@ -1554,9 +1636,11 @@ class RecommendMovieBasedOnSimilarTitleAdapter(LogicAdapter):
         print("After updating meta:", user_conversation[0].meta)
         self.chatbot.storage.update_conversation(self.user_id, user_conversation)
 
-    def update_meta_based_on_user_input(self, meta, statement, recommended_movies):
+    def update_meta_based_on_user_input(self, meta, statement):
+        recommend_movies_based_on_title = self.get_recommendation_engine_function('recommend_movies_based_on_title')
         invalid_input = False
         user_response = statement.text.strip().lower()
+        valid_responses = {'yes', 'no', '0'}
 
         if user_response == 'yes' and len(meta['similar_title_meta']['movies_list']) > 0:
             meta['similar_title_meta']['recommended_movies_list'].append(meta['similar_title_meta']['shown_movie'])
@@ -1566,18 +1650,18 @@ class RecommendMovieBasedOnSimilarTitleAdapter(LogicAdapter):
             self.active = False
             meta['similar_title_meta']['movies_list'].clear()
             meta['similar_title_meta']['shown_movie'].clear()
-        # TODO issue with this part of code as it does not allow me to enter an invalid input it simply never reaches
-        #  the else statement BIG PROBLEM!
-        elif user_response == self.title:
+        elif user_response not in valid_responses:
+            self.title = statement.text.strip()
+            recommended_movies = recommend_movies_based_on_title(self.title, self.user_id)
             meta['similar_title_meta']['movies_list'] = recommended_movies
             meta['similar_title_meta']['current_movie_index'] = 0
+        else:
+            invalid_input = True
 
         print(f"Update meta based on user input {print(meta)}")
         return meta, invalid_input
 
     def generate_next_movie_recommendation(self, meta, statement, invalid_input=False):
-
-        global next_movie_title
         user_response = statement.text.strip().lower()
 
         print("Meta data in generate_next_movie_recommendation:", meta)
@@ -1594,24 +1678,25 @@ class RecommendMovieBasedOnSimilarTitleAdapter(LogicAdapter):
         else:
             try:
                 if len(meta['similar_title_meta']['movies_list']) > 0:
-                    next_movie_title = meta['similar_title_meta']['movies_list'][current_movie_index][1]
+                    self.next_movie_title = meta['similar_title_meta']['movies_list'][current_movie_index][1]
                     shown_movie = meta['similar_title_meta']['movies_list'][current_movie_index]
                     meta['similar_title_meta']['shown_movie'] = shown_movie
 
                 # TODO - Test this, see if once you say yes does it allow you to rate the movie then, does it allow
                 #  you to suggest another movie title.
-                if user_response == 'yes':
-                    response_text = 'Awesome, I''m so glad you loved my recommendation! I hope you enjoy watching the ' \
-                                    'movie. ' \
-                                    'Once you''re done watching, you''ll be promoted to rate the movie! Your feedback ' \
-                                    'is ' \
-                                    'valuable and will help me make even better suggestions in the future. '
+                if user_response == 'yes' and len(meta['similar_title_meta']['movies_list']) > 0:
+                    response_text = " Awesome, I'm so glad you loved my recommendation! I hope you enjoy watching the " \
+                                    " movie." \
+                                    "Once you're done watching, you'll be promoted to rate the movie! Your feedback " \
+                                    " is " \
+                                    " valuable and will help me make even better suggestions in the future. "
                     self.active = False
                     self.movie_image_url = None
                     self.isPromptMessage = True
-                elif invalid_input:
-                    response_text = f"Sorry, I didn't understand that. Please reply with 'yes' or 'no' for {next_movie_title}." \
-                                    f"or 0 to go back to the recommendation menu."
+                elif invalid_input and self.next_movie_title == '':
+                    response_text = "Please enter a vaild title to receive a recommendation or 0 to go " \
+                                    "back to the recommendation menu."
+
                     self.movie_image_url = None
 
                 # TODO potentially might need to set first_interaction to TRUE
@@ -1620,14 +1705,14 @@ class RecommendMovieBasedOnSimilarTitleAdapter(LogicAdapter):
                     self.movie_image_url = None
                     self.isPromptMessage = True
                 else:
-                    response_text = f"Based on the title you provided, I really think you'll enjoy {next_movie_title}." \
+                    response_text = f"Based on the title you provided, I really think you'll enjoy {self.next_movie_title}." \
                                     f"Would you like to watch it now, or would you prefer a recommendation for another " \
                                     f"movie that's similar to the title provided? " \
                                     f"Please let me know by replying with 'yes' if you'd like to watch it, or 'no' if " \
                                     f"you'd like another recommendation or enter 0 to go back to the recommendation " \
                                     f"menu or type another movie title for different suggestions. 😁"
 
-                    self.movie_image_url = image_url(next_movie_title)
+                    self.movie_image_url = image_url(self.next_movie_title)
             except IndexError:
                 response_text = "No movie with a similar title found. Please try again with another title"
 
@@ -1648,9 +1733,15 @@ class RecommendMoviesBasedOnUserAdapter(LogicAdapter):
     def set_user_id(self, user_id):
         self.user_id = user_id
 
+    def get_recommendation_engine_function(self, function_name):
+        recommendation_engine = importlib.import_module('System.RecommendationEngine.recommendationEngine')
+        function = getattr(recommendation_engine, function_name)
+        return function
+
     def can_process(self, statement):
 
         bridge_adapter_activate_status = False
+        count_rated_movies_for_user = self.get_recommendation_engine_function('count_rated_movies_for_user')
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         print(
             f"Debug: RecommendMoviesBasedOnUserAdapter can_process called, statement: {statement.text.strip()}, self.active: {self.active}")
@@ -1679,7 +1770,9 @@ class RecommendMoviesBasedOnUserAdapter(LogicAdapter):
         user_conversation = self.get_or_create_user_conversation()
         self.store_user_input(statement)
         meta = self.initialize_meta(user_conversation)
-        if len(meta['SimilarUsersRecommendation']['recommended_movies_list']) > 0 is not None:
+        store_rating = self.get_recommendation_engine_function('store_rating')
+        recommend_movies_based_on_user = self.get_recommendation_engine_function('recommend_movies_based_on_user')
+        if len(meta['SimilarUsersRecommendation']['recommended_movies_list']) > 0:
             print(f"DEBUG: WE NEED TO CHECK ACTIVE STATUS: {self.active}")
             recommended_movie = meta['SimilarUsersRecommendation']['recommended_movies_list'][0]
             # Check if the user has provided a rating for the movie
@@ -1766,10 +1859,15 @@ class RecommendMoviesBasedOnUserAdapter(LogicAdapter):
         meta = self.initialize_meta(user_conversation)
         self.isPromptMessage = True
         self.active = False
+        self.first_interaction = True
 
         if 'SimilarUsersRecommendation' in meta:
-            meta['SimilarUsersRecommendation']['movies_list'].clear()
-            meta['SimilarUsersRecommendation']['shown_movie'].clear()
+            if meta['SimilarUsersRecommendation']['movies_list'] is not None:
+                meta['SimilarUsersRecommendation']['movies_list'].clear()
+
+            if meta['SimilarUsersRecommendation']['shown_movie'] is not None:
+                meta['SimilarUsersRecommendation']['shown_movie'].clear()
+
             meta['SimilarUsersRecommendation']['current_movie_index'] = 0
 
         self.update_user_conversation_meta(user_conversation, meta)
@@ -1861,17 +1959,19 @@ class RecommendMoviesBasedOnUserAdapter(LogicAdapter):
                 response_text = f"I plan on showing you the best movies, I think you would like based of similar " \
                                 f"users to you ..." \
                                 f"Here's the first one:  {next_movie_title}. Please let me know by replying with 'yes' " \
-                                f"if you'd like to watch it, or 'no' if you'd like another recommendation "
+                                f"if you'd like to watch it, or 'no' if you'd like another recommendation or enter " \
+                                f"'0' to go " \
+                                f"back to the main menu."
 
                 self.movie_image_url = image_url(next_movie_title)
 
 
             elif user_response == 'yes':
-                response_text = 'Awesome, I''m so glad you loved my recommendation! I hope you enjoy watching the ' \
-                                'movie. ' \
-                                'Once you''re done watching, you''ll be promoted to rate the movie! Your feedback ' \
-                                'is ' \
-                                'valuable and will help me make even better suggestions in the future. '
+                response_text = " Awesome, I'm so glad you loved my recommendation! I hope you enjoy watching the " \
+                                " movie." \
+                                "Once you're done watching, you'll be promoted to rate the movie! Your feedback " \
+                                " is " \
+                                " valuable and will help me make even better suggestions in the future. "
                 self.active = False
                 self.movie_image_url = None
                 self.isPromptMessage = True

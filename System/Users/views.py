@@ -2,7 +2,6 @@ from flask import Blueprint, render_template, redirect, request, url_for, flash
 from System import db
 from System.models import User
 from System.Users.forms import RegistrationForm
-from flask_login import current_user
 
 user = Blueprint('user', __name__)
 

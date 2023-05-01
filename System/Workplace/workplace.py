@@ -2,17 +2,12 @@ from scipy.sparse.linalg import svds
 from scipy.sparse import csr_matrix
 from sklearn.metrics import mean_squared_error
 import numpy as np
-import mysql.connector
 import pandas as pd
 from sklearn.model_selection import KFold
 from sklearn.model_selection import train_test_split
+from System.database import connect_db
 
-mydb = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="root",
-    database="movierecommendation"
-)
+mydb = connect_db()
 
 
 def create_ratings_table(mydb):

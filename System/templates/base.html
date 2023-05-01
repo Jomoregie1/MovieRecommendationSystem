@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   {% block head %}
 
   {% endblock %}
@@ -9,36 +11,86 @@
     <title>Movie Recommendation chatbot</title>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <a class="navbar-brand" href="{{url_for('core.index')}}">Buddy-Bot</a>
-  <button class="navbar-togger" type="button" data-toggle="collapse" data-target="#navbarText" aria-controls="navbarText" aria-expanded="false" aria-label="Toggle navigation">
-    <span class="navbar-toggler-icon"></span>
-  </button>
-  <div class="collapse navbar-collapse" id="navbarText">
-    <ul class="navbar-nav mr-auto">
-      {% if current_user.is_authenticated %}
-        <li class="nav-item">
-          <a class="nav-link" href="{{url_for('core.index')}}">Home <span class="sr-only">(current)</span></a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{url_for('core.logout')}}" style="color: red;">Logout</a>
-        </li>
-      {% else %}
-        <li class="nav-item">
-          <a class="nav-link" href="{{url_for('core.login')}}">Login</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{{url_for('user.signup')}}">Register</a>
-        </li>
-      {% endif %}
+{% if current_user.is_authenticated or (request.endpoint != 'core.login' and request.endpoint != 'user.signup' and request.endpoint!= 'forgot_password.forgot_password' and request.endpoint!= 'resetPassword.reset_password')%}
+  <!-- Add the custom navigation bar here -->
+  <div class="area"></div>
+  <nav class="main-menu">
+    <ul>
+      <li>
+        <button id="mode-toggle" style="background: none; border: none; cursor: pointer; color: #999; font-size: 14px;">
+          <i class="fa fa-adjust fa-2x"></i>
+          <span class="nav-text">Toggle Dark Mode</span>
+        </button>
+      </li>
+      <li>
+        <a href="{{url_for('core.index')}}">
+          <i class="fa fa-home fa-2x"></i>
+          <span class="nav-text">
+            Home
+          </span>
+        </a>
+      </li>
+     <li>
+      <a href="/add-movie">
+        <i class="fa fa-film fa-2x"></i>
+          <span class="nav-text">
+            Add a movie
+          </span>
+      </a>
+    </li>
     </ul>
-  </div>
-</nav>
+
+    <ul class="logout">
+      <li>
+        <a href="{{url_for('core.logout')}}">
+          <i class="fa fa-power-off fa-2x"></i>
+          <span class="nav-text">
+            Logout
+          </span>
+        </a>
+      </li>
+    </ul>
+  </nav>
+{% endif %}
 
 <div class="container">
   {% block content %}
 
   {% endblock %}
 </div>
+<script src="{{ url_for('static', filename='chatbot.js') }}"></script>
+<script>
+
+  const modeToggleButton = document.getElementById("mode-toggle");
+  const darkModeCSS = "/static/darkmode.css";
+
+  let darkModeEnabled = false;
+
+  modeToggleButton.addEventListener("click", () => {
+    if (darkModeEnabled) {
+      disableDarkMode();
+    } else {
+      enableDarkMode();
+    }
+  });
+
+  function enableDarkMode() {
+    const linkElement = document.createElement("link");
+    linkElement.rel = "stylesheet";
+    linkElement.id = "dark-mode-stylesheet";
+    linkElement.href = darkModeCSS;
+    document.head.appendChild(linkElement);
+    darkModeEnabled = true;
+  }
+
+  function disableDarkMode() {
+    const darkModeStylesheet = document.getElementById("dark-mode-stylesheet");
+    if (darkModeStylesheet) {
+      document.head.removeChild(darkModeStylesheet);
+    }
+    darkModeEnabled = false;
+  }
+</script>
+
 </body>
 </html>

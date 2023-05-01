@@ -1,7 +1,5 @@
 from flask import render_template, request, Blueprint, url_for, flash, redirect
 from flask_login import login_user, logout_user
-from System import db
-from System.Chatbot.views import reset_adapters
 from System.Chatbot.logicadapter import UserConversationLogicAdapter
 from System.Chatbot.views import chatbot
 from System.models import User, Admin
@@ -36,14 +34,12 @@ def login():
                     if isinstance(adapter, UserConversationLogicAdapter):
                         adapter.reset_first_interaction()
                         break
-                flash('Successfully logged in!')
                 return redirect(url_for('core.index'))
             else:
                 flash('Sorry, we did not recognise either your username or password ')
         else:
             if admin.check_admin(password=form.password.data):
                 login_user(admin)
-                flash('Successfully logged in!')
                 return redirect(url_for('admin.index'))
             else:
                 flash('Sorry, we did not recognise either your username or password ')
@@ -52,7 +48,7 @@ def login():
 
 @core.route('/logout')
 def logout():
-
+    from System.Chatbot.views import reset_adapters
     # Reset the state for all the previous adapters before logging out the user
     reset_adapters(chatbot)
 

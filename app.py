@@ -1,8 +1,18 @@
-from System import app, db
+from System import app
 
-# TODO need to get logic adapter working correctly
-# TODO need to sort out view to index/chat correct
-# TODO logic adapter should then wait for a rating from the user based for the given movie or if the user has not watched the suggested movie should process this to show the next movie in the list, iterating through this list until the user has rated 10 movies.
+# TODO need to get logic adapter working correctly TODO need to sort out view to index/chat correct TODO logic
+#  adapter should then wait for a rating from the user based for the given movie or if the user has not watched the
+#  suggested movie should process this to show the next movie in the list, iterating through this list until the user
+#  has rated 10 movies.
+
+# TODO WHEN REFACTORING CODE PLEASE IMPLEMENT APPLICATION FACTORY PATTERN
+# TODO NEED TO REFACTOR CODE IN RECOMMENDATION ENGINE TO FOLLOW OPP PRINCIPALS AND CLEAN CODE PRINCIPALS
+# TODO NEED TO REFACTOR CODE IN LOGIC ADAPTER TO FOLLOW SOLID PRINCIPALS
+# TODO TAKES A WHILE TO LOGOUT (NEED TO FIGURE OUT A QUICKER WAY TO ACCOMPLISH THAT.
+# TODO NEED TO ADD ELEMENT FOR USER TO ADD A MOVIE TO THE WEBSITE
+# TODO Make chatbot interface rounded
+#
+
 
 
 # from System.models import create_admin_account, Reading
