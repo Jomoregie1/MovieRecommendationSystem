@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/movie_submitted.css') }}">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="{{ url_for('static', filename='js/movie_submitted.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css')}}">
+{% endblock %}
+{% block content %}
+<div class="table-wrapper">
+    <h1 class="title"> <b> Movie Submissions</b></h1>
+    <input type="text" id="searchInput" placeholder="Search by approval status..."> <!-- Move the search input here -->
+    <div class="table-container">
+        <table>
+            <thead>
+            <tr class="sticky-header">
+                <th>Title</th>
+                <th>Year</th>
+                <th>Description</th>
+                <th>Genre</th>
+                <th>Approval Status</th>
+            </tr>
+            </thead>
+            <tbody>
+                {% for movie in movies %}
+                    <tr>
+                        <td>{{ movie[1] }}</td>
+                        <td>{{ movie[2] }}</td>
+                        <td>{{ movie[3] }}</td>
+                        <td>{{ movie[4] }}</td>
+                        <td>{{ movie[5] }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

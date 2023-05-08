@@ -5,12 +5,13 @@ from System.Chatbot.views import chatbot
 from System.models import User, Admin
 from System.Core.forms import LoginForm
 from flask_login import current_user
+from System.decorators import non_admin_required
 
 core = Blueprint('core', __name__)
 
 
-# TODO - FIX THIS AS THERE SHOULD BE ONE ROUTE TO THE HOMEPAGE WHICH '/CHAT'
 @core.route('/')
+@non_admin_required
 def index():
     # checks if the user is logged in, if not returns them to the login page.
     if not current_user.is_authenticated:
@@ -40,7 +41,7 @@ def login():
         else:
             if admin.check_admin(password=form.password.data):
                 login_user(admin)
-                return redirect(url_for('admin.index'))
+                return redirect(url_for('pending_movies.index'))
             else:
                 flash('Sorry, we did not recognise either your username or password ')
     return render_template('login.html', form=form)

@@ -1,0 +1,123 @@
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
+@import url(https://fonts.googleapis.com/css?family=Titillium+Web:300);
+
+table {
+    border-collapse: separate;
+    border-spacing: 0;
+    color: #4a4a4d;
+    font: 14px/1.4 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    margin: 0 auto;
+  }
+
+.table-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.table-wrapper {
+  padding-top: 50px; /* Adjust this value according to your needs */
+}
+
+body, html {
+  height: 100%;
+  margin: 0;
+  background: linear-gradient(135deg, #2E3192, #1BFFFF);
+}
+
+  th,
+  td {
+    padding: 10px 15px;
+    vertical-align: middle;
+  }
+
+  thead {
+    background: #395870;
+    background: linear-gradient(#868F96, #596164);
+    color: #fff;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+
+  th:first-child {
+    text-align: left;
+  }
+
+  .table-header{
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+
+tbody tr {
+  background: #fff;
+}
+
+  td {
+    border-bottom: 1px solid #cecfd5;
+    border-right: 1px solid #cecfd5;
+  }
+
+  td:first-child {
+    border-left: 1px solid #cecfd5;
+  }
+
+  .movie-title {
+    color: #395870;
+    display: block;
+  }
+
+  .text-offset {
+    color: #7c7c80;
+    font-size: 12px;
+  }
+
+  tfoot {
+    text-align: right;
+  }
+
+  tfoot tr:last-child {
+    background: #f0f0f2;
+    color: #395870;
+    font-weight: bold;
+  }
+
+  tfoot tr:last-child td:first-child {
+    border-bottom-left-radius: 5px;
+  }
+
+  tfoot tr:last-child td:last-child {
+    border-bottom-right-radius: 5px;
+  }
+
+.title{
+    text-align: center;
+    margin-bottom: 0px;
+    padding-top: 10px;
+    color: #fff;
+}
+
+.sticky-header {
+  position: sticky;
+  top: 0;
+  background-color: #395870;
+  background: linear-gradient(#868F96, #596164);
+  z-index: 10;
+}
+
+#searchInput {
+  width: 100%;
+  max-width: 300px;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  margin-bottom: 20px;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+#searchInput:focus {
+  border-color: #395870;
+}

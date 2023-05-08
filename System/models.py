@@ -10,7 +10,14 @@ with app.app_context():
 
     @login_manager.user_loader
     def load_user(email):
-        return User.query.get(email)
+        user = User.query.get(email)
+        if user is None:
+            user = Admin.query.get(email)
+            if user is not None:
+                user.is_admin = True
+        else:
+            user.is_admin = False
+        return user
 
 
     class User(db.Model, UserMixin):
@@ -41,11 +48,18 @@ with app.app_context():
 
 
     class Admin(db.Model, UserMixin):
-        __table__ = db.Model.metadata.tables['admin']
+        __tablename__ = 'admin'
+        __table_args__ = {'extend_existing': True}
+
+        email = db.Column(db.String(64), primary_key=True)
+        password = db.Column(db.String(128))
 
         def __init__(self, email, password):
             self.email = email
-            self.password_hash = generate_password_hash(password)
+            self.password = generate_password_hash(password)
+
+        def is_admin(self):
+            return True
 
         def __str__(self):
             return f'Admin {self.email}.'
@@ -55,10 +69,23 @@ with app.app_context():
 
         def check_admin(self, password):
             """Check if provided password matches admin's password."""
+            return check_password_hash(self.password, password)
 
+
+    def create_admin_account(email, password):
+        """Create initial admin account with provided email and password."""
+        if Admin.query.filter_by(email=email).first():
+            return
+        admin = Admin(email=email, password=password)
+        db.session.add(admin)
+        db.session.commit()
+
+
+    # Creates an admin
+    create_admin_account(email='admin@admin.com', password='admin')
 
     class Statement(db.Model):
-        __tablename__ = 'statement'  # Make sure the table name matches your existing table name
+        __tablename__ = 'statement'
         id = db.Column(db.Integer, primary_key=True)
         text = db.Column(db.String(500))
         search_text = db.Column(db.String(500))

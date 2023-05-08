@@ -3,8 +3,8 @@ from flask_mail import Mail
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
-from flask_admin import Admin
-from flask_admin.contrib.sqla import ModelView
+from flask_admin import Admin as FlaskAdmin
+from System.Admin.views import PendingMoviesView
 
 # login manager instance created
 login_manager = LoginManager()
@@ -29,8 +29,8 @@ login_manager.login_view = 'core.login'
 # Admin setup ------------------------------
 # from System.models import Reading
 app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
-admin = Admin(app, template_mode='bootstrap3')
-# admin.add_view(ModelView(Reading, db.session))
+flask_admin = FlaskAdmin(app, index_view=PendingMoviesView(name='Pending Movies', endpoint='pending_movies', url='/admin'), template_mode='bootstrap3')
+
 
 # adding blueprints -----------------------------------
 from System.Core.views import core
@@ -38,16 +38,23 @@ from System.error_pages.handlers import error_pages
 
 app.register_blueprint(core)
 app.register_blueprint(error_pages)
+
 from System.Users.views import user
 
 app.register_blueprint(user)
+
 from System.Chatbot.views import bot
 
 app.register_blueprint(bot)
+
 from System.Forgot_password.views import forgotPassword, restPassword
 
 app.register_blueprint(forgotPassword)
 app.register_blueprint(restPassword)
+
+from System.AddMovies.views import addMovie
+
+app.register_blueprint(addMovie)
 
 # Configuring Flask-mail in my application ---------------------
 app.config.update(
@@ -58,4 +65,3 @@ app.config.update(
     MAIL_PASSWORD='ZYbFsWD6JXRxyd1K'
 )
 mail = Mail(app)
-

@@ -8,39 +8,21 @@
 
   {% endblock %}
     <meta charset="UTF-8">
-    <title>Movie Recommendation chatbot</title>
+    <title>Admin page </title>
 </head>
 <body>
-{% set excluded_endpoints = ['core.login', 'user.signup', 'forgot_password.forgot_password', 'resetPassword.reset_password'] %}
-{% if current_user.is_authenticated or request.endpoint not in excluded_endpoints %}
   <!-- Add the custom navigation bar here -->
   <div class="area"></div>
   <nav class="main-menu">
     <ul>
       <li>
-        <a href="{{url_for('core.index')}}">
+        <a href="{{ url_for('pending_movies.index') }}">
           <i class="fa fa-home fa-2x"></i>
           <span class="nav-text">
-            Home
+            Admin Home
           </span>
         </a>
       </li>
-     <li>
-      <a href="{{url_for('addMovie.add_movie')}}">
-        <i class="fa fa-film fa-2x"></i>
-          <span class="nav-text">
-            Add a movie
-          </span>
-      </a>
-    </li>
-      <li>
-      <a href="{{url_for('addMovie.movie_submitted')}}">
-        <i class="fa fa-check-circle fa-2x"></i>
-          <span class="nav-text">
-            Movies submitted
-          </span>
-      </a>
-    </li>
     </ul>
 
     <ul class="logout">
@@ -54,11 +36,8 @@
       </li>
     </ul>
   </nav>
-{% endif %}
-
 <div class="container">
   {% block content %}
-
   {% endblock %}
 </div>
 </body>

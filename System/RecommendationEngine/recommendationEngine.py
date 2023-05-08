@@ -18,20 +18,28 @@ engine = create_engine(db_connection_string)
 nlp = spacy.load("en_core_web_lg")
 
 
-def popular_movies_df():
+def popular_and_new_movies_df():
     """
     Returns a list of popular movies based on the number of ratings and average rating.
     :return: list of tuples, each tuple containing movie ID and title
     """
     try:
-        query = """SELECT m.movieId, m.title, COUNT(r.ratings) as num_ratings, AVG(r.ratings) as avg_rating
+        query = """(
+                   SELECT m.movieId, m.title
                    FROM movies as m
                    INNER JOIN ratings as r ON m.movieId = r.movieId
                    GROUP BY m.movieId, m.title 
-                   HAVING num_ratings > 30
-                   ORDER BY avg_rating DESC, m.movieId ASC;"""
-        popular_movies_df = pd.read_sql_query(query, con=mydb)
-        return list(zip(popular_movies_df['movieId'], popular_movies_df['title']))
+                   HAVING COUNT(r.ratings) > 30
+                   ORDER BY AVG(r.ratings) DESC, m.movieId ASC
+                   )
+                   UNION
+                   (
+                   SELECT m.movieId, m.title
+                   FROM movies as m
+                   WHERE m.timestamp IS NOT NULL
+                   );"""
+        popular_and_new_movies_df = pd.read_sql_query(query, con=mydb)
+        return list(zip(popular_and_new_movies_df['movieId'], popular_and_new_movies_df['title']))
     except Exception as e:
         print("Error fetching popular movies:", e)
         return []
@@ -742,10 +750,10 @@ def recommend_movies_to_rate_for_new_users(user):
             list: A list of popular movies that the new user has not yet rated.
         """
     rated_movies = set(get_rated_movies(user))
-    popular_movies = set(popular_movies_df())
+    popular_and_new_movies = set(popular_and_new_movies_df())
 
     # Remove the movies that the user has already rated from the popular_movies_list
-    movies_to_rate = popular_movies - rated_movies
+    movies_to_rate = popular_and_new_movies - rated_movies
 
     if len(rated_movies) < 10:
         return list(movies_to_rate)

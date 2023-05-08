@@ -1,19 +1,32 @@
 {% extends "base.html" %}
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='chatbot.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chatbot.css') }}">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="{{ url_for('static', filename='chatbot.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css')}}">
 {% endblock %}
 
 {% block content %}
-
-    <br><br>
-    <div id="chat-container">
-        <!-- Chat messages will be appended here -->
+<section class="msger">
+  <header class="msger-header">
+    <div class="msger-header-title">
+      <i class="fas fa-comment-alt"></i> Buddy-Bot
     </div>
-    <form id="message-form">
-    <input type="text" id="message-input" placeholder="Type your message...">
+    <div class="msger-header-options">
+      <span id="clear-chat"><i class="fas fa-trash-alt"></i></span>
+    </div>
+  </header>
+
+  <main class="msger-chat" id="chat-container">
+    <!-- Chat messages will be appended here -->
+  </main>
+
+  <form class="msger-inputarea" id="message-form">
+    <input type="text" class="msger-input" id="message-input" placeholder="Enter your message...">
     <input type="hidden" name="user_id" value="{{ current_user.id }}">
-    <button id="submit-button">Send</button>
-    </form>
+    <input type="hidden" id="user-name" value="{{ current_user.first_name}}">
+    <input type="hidden" name="current_time" id="current_time">
+    <button type="submit" class="msger-send-btn"><i class="fas fa-paper-plane"></i></button>
+  </form>
+</section>
 {% endblock %}

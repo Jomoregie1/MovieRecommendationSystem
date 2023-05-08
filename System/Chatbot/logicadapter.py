@@ -105,8 +105,8 @@ class UserConversationLogicAdapter(LogicAdapter):
         user_conversation = self.get_or_create_user_conversation()
         self.store_user_input(statement)
         rate_for_new_users = self.get_recommendation_engine_function('recommend_movies_to_rate_for_new_users')
-        popular_movies = rate_for_new_users(self.user_id)
-        meta = self.initialize_meta(user_conversation, popular_movies)
+        popular_and_new_movies = rate_for_new_users(self.user_id)
+        meta = self.initialize_meta(user_conversation, popular_and_new_movies)
         num_rated_movies = count_rated_movies_for_user(self.user_id)
         meta, invalid_input = self.update_meta_based_on_user_input(meta, statement)
         if count_rated_movies_for_user(self.user_id) == 10:
@@ -514,7 +514,7 @@ class RecommendMoviesBasedOnYearAndGenreAdapter(LogicAdapter):
         self.chatbot.storage.update_conversation(self.user_id, user_conversation)
 
     def update_meta_based_on_user_input(self, meta, statement):
-        list_of_genres = self.get_recommendation_engine_function('list_of_genre')
+        list_of_genres = self.get_recommendation_engine_function('list_of_genres')
         recommend_movies_based_on_year_and_genre = self.get_recommendation_engine_function('recommend_movies_based_on_year_and_genre')
         user_response = statement.text.strip().lower()
         genre_list = [genre.lower() for genre in list_of_genres()]
@@ -1078,7 +1078,7 @@ class RecommendMovieBasedOnGenreAdapter(LogicAdapter):
 
     def update_meta_based_on_user_input(self, meta, statement):
         recommend_movies_based_on_genre = self.get_recommendation_engine_function('recommend_movies_based_on_genre')
-        list_of_genres = self.get_recommendation_engine_function('list_of_genre')
+        list_of_genres = self.get_recommendation_engine_function('list_of_genres')
         user_response = statement.text.strip().lower()
         genre_list = [genre.lower() for genre in list_of_genres()]
         invalid_input = False

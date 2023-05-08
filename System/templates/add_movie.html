@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/add_movie.css') }}">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css')}}">
+{% endblock %}
+{% block content %}
+<body>
+    <div class="title">Add Movie</div>
+    <div class="content">
+      <form method="POST" action="{{ url_for('addMovie.add_movie') }}">
+        {{ form.hidden_tag() }}
+        <div class="user-details">
+          <div class="input-box">
+            <span class="details">{{ form.title.label }}</span>
+            {{ form.title(placeholder="Enter movie title", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details">{{ form.year.label }}</span>
+            {{ form.year(placeholder="Enter movie year", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details">{{ form.description.label }}</span>
+            {{ form.description(placeholder="Enter movie description", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details">{{ form.initial_rating.label }}</span>
+            {{ form.initial_rating(placeholder="Enter initial rating", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details">{{ form.genre.label }}</span>
+            {{ form.genre(class="custom-select", required=True) }}
+          </div>
+        </div>
+        <div class="button">
+          {{ form.submit(value="Add Movie") }}
+        </div>
+      </form>
+    </div>
+</body>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends 'admin/admin_base.html' %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='admin/css/admin.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="{{ url_for('static', filename='admin/js/admin.js') }}"></script>
+{% endblock %}
+{% block content %}
+<div class="table-wrapper">
+    <h1 class="title"> <b> Pending movies </b></h1>
+    <input type="text" id="searchInput" placeholder="Search by email..."> <!-- Move the search input here -->
+    <div class="table-container">
+        <table>
+            <thead>
+        <tr class="sticky-header">
+            <th>ID</th>
+            <th>Title</th>
+            <th>Year</th>
+            <th>Description</th>
+            <th>Genre</th>
+            <th>Submitted by</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for movie in movies %}
+        <tr>
+            <td>{{ movie[0] }}</td>
+            <td>
+                <strong class="movie-title">{{ movie[1] }}</strong>
+            </td>
+            <td>{{ movie[2] }}</td>
+            <td>{{ movie[3] }}</td>
+            <td>{{ movie[4] }}</td>
+            <td>{{ movie[5] }}</td>
+            <td>
+                {% if movie[6] == 'Pending' %}
+                <div class="action-buttons">
+                    <a href="{{ url_for('pending_movies.approve_movie', movie_id=movie[0]) }}"><i class="fas fa-check"></i></a> |
+                    <a href="{{ url_for('pending_movies.admin_decline_movie', movie_id=movie[0]) }}"><i class="fas fa-times"></i></a>
+                </div>
+                {% elif movie[6] == 'Approved' %}
+                    Approved
+                {% elif movie[6] == 'Rejected' %}
+                    Rejected
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+</div>
+{% endblock %}

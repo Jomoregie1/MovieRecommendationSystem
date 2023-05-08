@@ -1,5 +1,9 @@
-{% extends 'base.html' %}
-
+{% extends "base.html" %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/register.css') }}">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css')}}">
+{% endblock %}
 {% block content %}
 {% with messages = get_flashed_messages() %}
 {% if messages %}
@@ -10,62 +14,46 @@
 {% endfor %}
 {% endif %}
 {% endwith %}
-  <section class="vh-100 gradient-custom">
-  <div class="container py-5 h-100">
-    <div class="row d-flex justify-content-center align-items-center h-100">
-      <div class="col-12 col-md-9 col-lg-8 col-xl-7">
-        <div class="card bg-dark text-white" style="border-radius: 1rem;">
-          <div class="card-body p-5 text-center">
-
-            <div class="mb-md-5 mt-md-4 pb-5">
-
-              <h2 class="fw-bold mb-2 text-uppercase">Create an account</h2>
-
-              <form method="POST">
-                {{ form.csrf_token }}
-                <div class="form-outline form-white mb-4">
-                  <label class="form-label" >{{form.first_name.label}}</label>
-                  {{form.first_name(class="form-control form-control-lg")}}
-                </div>
-                <div class="form-outline form-white mb-4">
-                  <label class="form-label" >{{form.last_name.label}}</label>
-                  {{form.last_name(class="form-control form-control-lg")}}
-                </div>
-                <div class="form-outline form-white mb-4">
-                  <label class="form-label">{{form.gender.label}}</label>
-                  {{form.gender(class="form-control form-control-lg")}}
-                </div>
-                <div class="form-outline form-white mb-4">
-                  <label class="form-label" >{{form.age.label}}</label>
-                  {{form.age(class="form-control form-control-lg")}}
-                </div>
-                <div class="form-outline form-white mb-4">
-                  <label class="form-label">{{form.email.label}}</label>
-                  {{form.email(class="form-control form-control-lg")}}
-                </div>
-                <div class="form-outline form-white mb-4">
-                  <label class="form-label">{{form.password.label}}</label>
-                  {{form.password(class="form-control form-control-lg")}}
-                </div>
-                <div class="form-outline form-white mb-4">
-                  <label class="form-label">{{form.pass_confirm.label}}</label>
-                  {{form.pass_confirm(class="form-control form-control-lg")}}
-                </div>
-
-                {{form.submit(class="btn btn-outline-light btn-lg px-5")}}
-
-              </form>
-
-            </div>
-
-            <div>
-              <p class="mb-0">Have already an account? <a href="{{url_for('core.login')}}" class="text-white-50 fw-bold">Login here</a></p>
-            </div>
-
+<body>
+    <div class="title">Create an account</div>
+    <div class="content">
+      <form method="POST">
+        {{ form.hidden_tag() }}
+        <div class="user-details">
+          <div class="input-box">
+            <span class="details">{{ form.first_name.label }}</span>
+            {{ form.first_name(placeholder="Enter first name", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details">{{ form.last_name.label }}</span>
+            {{ form.last_name(placeholder="Enter last name", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details gender-label">{{ form.gender.label }}</span>
+            {{ form.gender(class="custom-select", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details">{{ form.age.label }}</span>
+            {{ form.age(placeholder="Enter age", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details">{{ form.email.label }}</span>
+            {{ form.email(placeholder="Enter email", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details">{{ form.password.label }}</span>
+            {{ form.password(placeholder="Enter password", required=True) }}
+          </div>
+          <div class="input-box">
+            <span class="details">{{ form.pass_confirm.label }}</span>
+            {{ form.pass_confirm(placeholder="Confirm password", required=True) }}
           </div>
         </div>
-      </div>
+        <div class="button">
+          {{ form.submit(class="btn btn-outline-light btn-lg px-5", value="Sign Up") }}
+        </div>
+      </form>
+      <p class="mb-0 custom-p">Have already an account? <a href="{{url_for('core.login')}}" class="text-white-50 fw-bold login-link">Login here</a></p>
     </div>
-  </div>
-</section>
+</body>
 {% endblock %}

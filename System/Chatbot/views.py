@@ -2,6 +2,8 @@ from flask import render_template, request, jsonify, Blueprint
 from flask_login import current_user
 from chatterbot import ChatBot
 from chatterbot.conversation import Statement
+from System.models import User
+from System.decorators import non_admin_required
 
 bot = Blueprint('chatbot', __name__)
 
@@ -97,10 +99,17 @@ def get_response_and_image_url(chatbot, user_message, conversation, user_id):
     return chatbot_response, movie_image_url
 
 
-@bot.route('/chat', methods=['GET', 'POST'])
+@bot.route('/', methods=['GET', 'POST'])
+@non_admin_required
 def chat():
+
+    global user_name
+
     if request.method == 'POST':
         user_id = current_user.get_id()  # Get the current user ID from Flask-Login
+
+        user = User.query.get(user_id)
+        user_name = user.first_name
 
         # Get the user's message from the request data
         user_message = request.form.get('message')
@@ -118,4 +127,4 @@ def chat():
 
         return jsonify({'status': 'success', 'response': str(chatbot_response), 'movie_image_url': movie_image_url})
 
-    return render_template('index.html')
+    return render_template('index.html', user_name=user_name)
