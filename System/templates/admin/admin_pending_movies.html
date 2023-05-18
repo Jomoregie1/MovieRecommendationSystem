@@ -6,6 +6,15 @@
 <script src="{{ url_for('static', filename='admin/js/admin.js') }}"></script>
 {% endblock %}
 {% block content %}
+{% with messages = get_flashed_messages(category_filter=['admin-sucess']) %}
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
 <div class="table-wrapper">
     <h1 class="title"> <b> Pending movies </b></h1>
     <input type="text" id="searchInput" placeholder="Search by email..."> <!-- Move the search input here -->

@@ -1,5 +1,5 @@
 from flask import redirect, url_for, flash
-from flask_login import login_required, current_user
+from flask_login import current_user
 from System.database import connect_db
 from flask_admin import AdminIndexView, expose
 
@@ -17,9 +17,8 @@ def get_pending_movies():
                    WHERE pm.is_approved = FALSE"""
         cursor.execute(query)
         pending_movies = cursor.fetchall()
-        print(pending_movies)
     except Exception as e:
-        print(f"Error fetching pending movies: {e}")
+        print(f"Error retrieving pending movies: {e}")
         pending_movies = []
     finally:
         if mydb.is_connected():
@@ -110,13 +109,12 @@ class PendingMoviesView(AdminIndexView):
             return self.render('index.html')
 
         pending_movies = get_pending_movies()
-        print(f"pending_movies")
         return self.render('admin/admin_pending_movies.html', movies=pending_movies)
 
     @expose('/approve/<int:movie_id>', methods=['GET'])
     def approve_movie(self, movie_id):
         if not current_user.is_admin:
-            flash("You don't have permission to access this page.", 'warning')
+            flash("You don't have permission to access this page.", 'admin-warning')
             return redirect(url_for('core.index'))
 
         approve_movie(movie_id)
@@ -126,9 +124,9 @@ class PendingMoviesView(AdminIndexView):
     @expose('/decline/<int:movie_id>')
     def admin_decline_movie(self, movie_id):
         if not current_user.is_admin:
-            flash("You don't have permission to access this page.", 'warning')
+            flash("You don't have permission to access this page.", 'admin-warning')
             return redirect(url_for('core.index'))
 
         decline_movie(movie_id)
-        flash("Movie declined successfully!", 'success')
+        flash("Movie declined successfully!", 'admin-success')
         return redirect(url_for('pending_movies.index'))

@@ -68,7 +68,6 @@ def movie_submitted():
                    WHERE pm.userId = %s"""
         cursor.execute(query, (user_id,))
         submitted_movies = cursor.fetchall()
-        print(submitted_movies)
     except Exception as e:
         print(f"Error fetching submitted movies: {e}")
         submitted_movies = []

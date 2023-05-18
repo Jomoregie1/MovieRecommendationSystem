@@ -36,12 +36,21 @@ with app.app_context():
             self.age = age
             self.gender = gender
             self.password = generate_password_hash(password)
+            self._is_admin = False
 
         def check_user(self, password):
             return check_password_hash(self.password, password)
 
         def get_id(self):
             return self.userId
+
+        @property
+        def is_admin(self):
+            return getattr(self, '_is_admin', False)
+
+        @is_admin.setter
+        def is_admin(self, value):
+            self._is_admin = value
 
         def __str__(self):
             return f'Id of user: {self.userId}'
@@ -57,9 +66,15 @@ with app.app_context():
         def __init__(self, email, password):
             self.email = email
             self.password = generate_password_hash(password)
+            self._is_admin = True
 
+        @property
         def is_admin(self):
-            return True
+            return self._is_admin
+
+        @is_admin.setter
+        def is_admin(self, value):
+            self._is_admin = value
 
         def __str__(self):
             return f'Admin {self.email}.'
@@ -83,6 +98,7 @@ with app.app_context():
 
     # Creates an admin
     create_admin_account(email='admin@admin.com', password='admin')
+
 
     class Statement(db.Model):
         __tablename__ = 'statement'

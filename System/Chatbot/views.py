@@ -38,11 +38,6 @@ chatbot = ChatBot(
         }
     ]
 )
-# trainer = ChatterBotCorpusTrainer(chatbot)
-# trainer.train('chatterbot.corpus.english')
-
-print("Logic Adapters:", chatbot.logic_adapters)
-
 
 def reset_adapters(chatbot):
     for adapter in chatbot.logic_adapters:
@@ -52,9 +47,7 @@ def reset_adapters(chatbot):
 
 def get_first_matching_adapter(adapters, statement):
     for adapter in adapters:
-        print(f"Debug: Checking if {adapter.__class__.__name__} can process the statement: {statement}")
         if adapter.can_process(statement):
-            print(f"Debug: {adapter.__class__.__name__} can process the statement: {statement}")
             return adapter
     return None
 
@@ -92,7 +85,6 @@ def get_response_and_image_url(chatbot, user_message, conversation, user_id):
         if isinstance(matching_adapter, movie_image_url_adapters):
             if hasattr(matching_adapter, 'movie_image_url') and matching_adapter.movie_image_url is not None:
                 movie_image_url = matching_adapter.movie_image_url
-                print(f"Adapter {type(matching_adapter).__name__} movie_image_url: {movie_image_url}")
 
         chatbot_response = response.text
 
@@ -114,16 +106,12 @@ def chat():
         # Get the user's message from the request data
         user_message = request.form.get('message')
 
-        print(user_message)
-
         # Create a new conversation or get an existing one for the user
         conversation = chatbot.storage.get_conversation(user_id)
         if not conversation:
             conversation = chatbot.storage.create_conversation(user_id)
 
         chatbot_response, movie_image_url = get_response_and_image_url(chatbot, user_message, conversation, user_id)
-
-        print(f"Chatbot response: {str(chatbot_response)}")
 
         return jsonify({'status': 'success', 'response': str(chatbot_response), 'movie_image_url': movie_image_url})
 

@@ -18,28 +18,20 @@ engine = create_engine(db_connection_string)
 nlp = spacy.load("en_core_web_lg")
 
 
-def popular_and_new_movies_df():
+def popular_movies_df():
     """
     Returns a list of popular movies based on the number of ratings and average rating.
     :return: list of tuples, each tuple containing movie ID and title
     """
     try:
-        query = """(
-                   SELECT m.movieId, m.title
+        query = """SELECT m.movieId, m.title, COUNT(r.ratings) as num_ratings, AVG(r.ratings) as avg_rating
                    FROM movies as m
                    INNER JOIN ratings as r ON m.movieId = r.movieId
                    GROUP BY m.movieId, m.title 
-                   HAVING COUNT(r.ratings) > 30
-                   ORDER BY AVG(r.ratings) DESC, m.movieId ASC
-                   )
-                   UNION
-                   (
-                   SELECT m.movieId, m.title
-                   FROM movies as m
-                   WHERE m.timestamp IS NOT NULL
-                   );"""
-        popular_and_new_movies_df = pd.read_sql_query(query, con=mydb)
-        return list(zip(popular_and_new_movies_df['movieId'], popular_and_new_movies_df['title']))
+                   HAVING num_ratings > 30
+                   ORDER BY avg_rating DESC, m.movieId ASC;"""
+        popular_movies_df = pd.read_sql_query(query, con=mydb)
+        return list(zip(popular_movies_df['movieId'], popular_movies_df['title']))
     except Exception as e:
         print("Error fetching popular movies:", e)
         return []
@@ -124,7 +116,6 @@ def store_rating(user_id, movie_id, rating):
     :param movie_id: int, movie ID
     :param rating: float, rating given by the user
     """
-    print(f"Storing rating: user_id={user_id}, movie_id={movie_id}, rating={rating}")
 
     check_query = "SELECT COUNT(*) FROM ratings WHERE userId = %s AND movieId = %s"
     insert_query = "INSERT INTO ratings (userId, movieId, ratings) VALUES (%s, %s, %s)"
@@ -135,12 +126,10 @@ def store_rating(user_id, movie_id, rating):
             count = cursor.fetchone()[0]
 
             if count > 0:
-                print(f"Error: Movie ID {movie_id} already has a rating for User ID {user_id}")
                 return False
             else:
                 cursor.execute(insert_query, (user_id, movie_id, rating))
                 mydb.commit()
-                print("Rating stored successfully")
                 return True
 
     except mysql.connector.Error as e:
@@ -600,7 +589,8 @@ def recommend_movies_based_on_year(year, user):
     seen_movies = set(title for _, title in get_rated_movies(user))
 
     # Remove the movies that the user has already seen
-    unseen_titles = [title for title, movieId in zip(movies_by_year['title'], movies_by_year['movieId']) if movieId not in seen_movies and movieId in temp_pred_df.columns]
+    unseen_titles = [title for title, movieId in zip(movies_by_year['title'], movies_by_year['movieId']) if
+                     movieId not in seen_movies and movieId in temp_pred_df.columns]
 
     # Find the three most similar users
     sim_users = get_similar_users(user, temp_pred_df)
@@ -750,11 +740,10 @@ def recommend_movies_to_rate_for_new_users(user):
             list: A list of popular movies that the new user has not yet rated.
         """
     rated_movies = set(get_rated_movies(user))
-    popular_and_new_movies = set(popular_and_new_movies_df())
+    popular_movies = set(popular_movies_df())
 
     # Remove the movies that the user has already rated from the popular_movies_list
-    movies_to_rate = popular_and_new_movies - rated_movies
+    movies_to_rate = popular_movies - rated_movies
 
     if len(rated_movies) < 10:
         return list(movies_to_rate)
-

@@ -13,7 +13,7 @@ def signup():
     if form.validate_on_submit():
         user_email = User.query.filter_by(email=form.email.data).first()
         if user_email:
-            flash('Email already exists.')
+            flash('Email already exists.', 'signup')
             return redirect(url_for('user.signup'))
 
         user_profile = User(first_name=form.first_name.data,
@@ -25,9 +25,7 @@ def signup():
 
         db.session.add(user_profile)
         db.session.commit()
-        flash(f'Thanks {form.first_name.data}  {form.last_name.data}, for registering')
+        flash(f'Thanks {form.first_name.data}  {form.last_name.data}, for registering', 'signup-after')
         return redirect(url_for('core.login'))
-    else:
-        print(form.errors)
 
     return render_template('register.html', form=form)

@@ -1,3 +1,5 @@
+from collections import defaultdict
+from matplotlib import pyplot as plt
 from scipy.sparse.linalg import svds
 from scipy.sparse import csr_matrix
 from sklearn.metrics import mean_squared_error
@@ -61,8 +63,7 @@ def cross_validate(ratings_table, n_splits=10, k=10, random_state=1):
         mse = mean_squared_error(ratings_val_sparse.data, pred_val[ratings_val_sparse.nonzero()])
         mse_values.append(mse)
 
-    mean_mse = np.mean(mse_values)
-    return mean_mse
+    return mse_values
 
 
 def evaluate_model(ratings_table, test_size=0.2, random_state=1, k=10):
@@ -80,13 +81,138 @@ def evaluate_model(ratings_table, test_size=0.2, random_state=1, k=10):
 
     mse_test = mean_squared_error(ratings_test_sparse.data, pred_val[ratings_test_sparse.nonzero()])
 
-    return pred_val, X_train.index, mse_test
+    return pred_val, X_train, X_test, mse_test
 
-# ratings_table = create_ratings_table(mydb)
-#
-# mean_mse = cross_validate(ratings_table)
-# print(f"Mean MSE over 10-fold cross validation: {mean_mse:.4f}")
-#
-# pred_val, user_index, mse_test = evaluate_model(ratings_table)
-# pred_df = create_pred_df(pred_val, ratings_table, user_index)
-# print(pred_df)
+
+def plot_rating_distribution(ratings_table):
+    rounded_ratings = np.round(ratings_table.values.flatten())
+    plt.figure(figsize=(10, 5))
+    plt.hist(rounded_ratings, bins=np.arange(0.5, 6.5, 1), alpha=0.7, color='b', edgecolor='black')
+    plt.xticks(range(1, 6))
+    plt.xlabel('Rating')
+    plt.ylabel('Frequency')
+    plt.title('Distribution of Ratings')
+    plt.show()
+
+
+def plot_mse(mse_values, mse_test):
+    plt.figure(figsize=(10, 5))
+
+    # plot MSE for each fold in cross-validation
+    plt.bar(range(1, len(mse_values) + 1), mse_values, color='blue', label='Cross-validation MSE')
+
+    # plot MSE for test set
+    plt.axhline(y=mse_test, color='red', linestyle='-', label='Test MSE')
+
+    plt.xlabel('Fold')
+    plt.ylabel('MSE')
+    plt.legend()
+    plt.title('Model MSE across folds and on test set')
+    plt.show()
+
+
+def plot_matrix_sparsity(ratings_table):
+    plt.figure(figsize=(10, 5))
+    plt.spy(ratings_table)
+    plt.xlabel('Movies')
+    plt.ylabel('Users')
+    plt.title('Matrix Sparsity')
+    plt.show()
+
+
+def plot_mse_vs_factors(ratings_table, max_k=50):
+    k_values = range(1, max_k + 1)
+    mse_values = []
+    for k in k_values:
+        mse_k = cross_validate(ratings_table, k=k)
+        mse_values.append(np.mean(mse_k))
+    plt.figure(figsize=(10, 5))
+    plt.plot(k_values, mse_values, marker='o', linestyle='-')
+    plt.xlabel('Number of Latent Factors (k)')
+    plt.ylabel('Mean MSE')
+    plt.title('MSE vs. Number of Latent Factors')
+    plt.show()
+
+
+def precision_recall_at_k(predictions, k=10, threshold=3.5):
+    '''Return precision and recall at k metrics for each user.'''
+
+    # First map the predictions to each user.
+    user_est_true = defaultdict(list)
+    for uid, _, true_r, est in predictions:
+        user_est_true[uid].append((est, true_r))
+
+    precisions = dict()
+    recalls = dict()
+    for uid, user_ratings in user_est_true.items():
+        # Sort user ratings by estimated value
+        user_ratings.sort(key=lambda x: x[0], reverse=True)
+
+        # Number of relevant items
+        n_rel = sum((true_r >= threshold) for (_, true_r) in user_ratings)
+
+        # Number of recommended items in top k
+        n_rec_k = sum((est >= threshold) for (est, _) in user_ratings[:k])
+
+        # Number of relevant and recommended items in top k
+        n_rel_and_rec_k = sum(((true_r >= threshold) and (est >= threshold))
+                              for (est, true_r) in user_ratings[:k])
+
+        # Precision@K: Proportion of recommended items that are relevant
+        precisions[uid] = n_rel_and_rec_k / n_rec_k if n_rec_k != 0 else 1
+
+        # Recall@K: Proportion of relevant items that are recommended
+        recalls[uid] = n_rel_and_rec_k / n_rel if n_rel != 0 else 1
+
+    return precisions, recalls
+
+
+def plot_precision_recall_curve(precision_list, recall_list, k_list):
+    plt.figure(figsize=(8, 6))
+    plt.plot(k_list, precision_list, label='Precision', marker='o')
+    plt.plot(k_list, recall_list, label='Recall', marker='o')
+    plt.xlabel('Number of Recommendations (k)')
+    plt.ylabel('Score')
+    plt.title('Precision-Recall Curve')
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+
+def generate_predictions(ratings_table, pred_val):
+    predictions = []
+    for i in range(len(ratings_table)):
+        for j in range(len(ratings_table.columns)):
+            if ratings_table.iloc[i, j] != 0:
+                uid = ratings_table.index[i]
+                iid = ratings_table.columns[j]
+                true_r = ratings_table.iloc[i, j]
+                est = pred_val[i, j]
+                predictions.append((uid, iid, true_r, est))
+    return predictions
+
+
+if __name__ == '__main__':
+    ratings_table = create_ratings_table(mydb)
+    mse_values = cross_validate(ratings_table, n_splits=10, k=10, random_state=1)
+    pred_val, X_train, X_test, mse_test = evaluate_model(ratings_table, test_size=0.2, random_state=1, k=10)
+
+    plot_mse(mse_values, mse_test)
+    plot_rating_distribution(ratings_table)
+    plot_matrix_sparsity(ratings_table)
+    plot_mse_vs_factors(ratings_table)
+
+    k_values = range(1, 51)  # Test with k from 1 to 50
+    precision_list = []
+    recall_list = []
+
+    predictions = generate_predictions(X_train, pred_val)
+
+    for k in k_values:
+        precisions, recalls = precision_recall_at_k(predictions, k=k)
+        precision_k = np.mean(list(precisions.values()))
+        recall_k = np.mean(list(recalls.values()))
+        precision_list.append(precision_k)
+        recall_list.append(recall_k)
+
+    plot_precision_recall_curve(precision_list, recall_list, k_values)

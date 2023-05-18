@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css')}}">
 {% endblock %}
 {% block content %}
-{% with messages = get_flashed_messages() %}
+{% with messages = get_flashed_messages(category_filter=['signup']) %}
 {% if messages %}
 {% for message in messages %}
 <div class="alert alert-success alert-dismissible fade show" role="alert">

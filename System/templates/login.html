@@ -1,5 +1,14 @@
 {% extends 'base.html' %}
 {% block content %}
+{% with messages = get_flashed_messages(category_filter=['login_error', 'signup-after', 'forgot-password']) %}
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
 <section class="vh-100 gradient-custom">
   <div class="container py-5 h-100 ">
     <div class="row d-flex justify-content-center align-items-center h-100">

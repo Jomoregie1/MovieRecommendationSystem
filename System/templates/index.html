@@ -7,6 +7,15 @@
 {% endblock %}
 
 {% block content %}
+{% with messages = get_flashed_messages(category_filter=['admin-warning']) %}
+{% if messages %}
+{% for message in messages %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
 <section class="msger">
   <header class="msger-header">
     <div class="msger-header-title">
@@ -18,7 +27,6 @@
   </header>
 
   <main class="msger-chat" id="chat-container">
-    <!-- Chat messages will be appended here -->
   </main>
 
   <form class="msger-inputarea" id="message-form">

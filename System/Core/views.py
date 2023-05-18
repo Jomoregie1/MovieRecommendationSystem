@@ -1,4 +1,4 @@
-from flask import render_template, request, Blueprint, url_for, flash, redirect
+from flask import render_template, Blueprint, url_for, flash, redirect
 from flask_login import login_user, logout_user
 from System.Chatbot.logicadapter import UserConversationLogicAdapter
 from System.Chatbot.views import chatbot
@@ -15,7 +15,7 @@ core = Blueprint('core', __name__)
 def index():
     # checks if the user is logged in, if not returns them to the login page.
     if not current_user.is_authenticated:
-        flash('Please login')
+        flash('Please login', 'login_error')
         return redirect(url_for('core.login'))
 
     return render_template('index.html')
@@ -37,13 +37,13 @@ def login():
                         break
                 return redirect(url_for('core.index'))
             else:
-                flash('Sorry, we did not recognise either your username or password ')
+                flash('Sorry, we did not recognise either your username or password', 'login_error')
         else:
             if admin.check_admin(password=form.password.data):
                 login_user(admin)
                 return redirect(url_for('pending_movies.index'))
             else:
-                flash('Sorry, we did not recognise either your username or password ')
+                flash('Sorry, we did not recognise either your username or password ', 'login_error')
     return render_template('login.html', form=form)
 
 
@@ -54,5 +54,4 @@ def logout():
     reset_adapters(chatbot)
 
     logout_user()
-    flash('You have been logged out!')
     return redirect(url_for("core.login"))

@@ -45,21 +45,15 @@ def forgot_password():
     form = ForgotPasswordForm()
 
     if form.validate_on_submit():
-        print("Form validated")  # Debugging print statement
         email = form.email.data
-        print(f"Entered email: {email}")
         user = User.query.filter_by(email=email).first()
         if user:
-            print(f"User found: {user}")  # Debugging print statement
             token = generate_token(user.email)
             send_reset_email(user, token)
-            flash('An email has been sent with instructions to reset your password.', 'info')
+            flash('An email has been sent with instructions to reset your password.', 'forgot-password')
             return redirect(url_for('core.login'))
         else:
-            flash('No account found with that email address.', 'warning')
-            print("User not found")  # Debugging print statement
-    else:
-        print("Form not validated")  # Debugging print statement
+            flash('No account found with that email address.', 'forgot-password')
 
     return render_template('forgot_password.html', form=form)
 
@@ -69,7 +63,7 @@ def reset_password(token):
     try:
         email = confirm_token(token)
     except:
-        flash('The confirmation link is invalid or has expired.', 'danger')
+        flash('The confirmation link is invalid or has expired.', 'forgot-password')
         return redirect(url_for('forgot_password.forgot_password'))
 
     form = ResetPasswordForm()
@@ -84,10 +78,10 @@ def reset_password(token):
             mydb.commit()
             cursor.close()
 
-            flash('Your password has been updated!', 'success')
+            flash('Your password has been updated!', 'reset-password')
             return redirect(url_for('core.login'))
         else:
-            flash('An error occurred. Please try again later.', 'danger')
+            flash('An error occurred. Please try again later.', 'reset-password')
             return redirect(url_for('forgot_password.forgot_password'))
 
     return render_template('reset_password.html', form=form)

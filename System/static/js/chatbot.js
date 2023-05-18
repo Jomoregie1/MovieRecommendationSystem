@@ -86,7 +86,7 @@ function appendMessage(cssClass, messageText, senderName, timestamp, imageURL) {
 $(document).ready(function () {
   console.log('Document is ready');
 
-  initCloseButtons(); // Call the function to initialize close buttons
+  initCloseButtons();
 
   $('#message-form').submit(function (event) {
     console.log('Form submitted');
