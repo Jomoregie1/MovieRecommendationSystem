@@ -7,14 +7,13 @@ from sklearn.neighbors import NearestNeighbors
 import pandas as pd
 from sqlalchemy import create_engine, text
 from fuzzywuzzy import process
-from System.database import connect_db
+from System.database import connect_db, db_connection_string_mr
 import spacy
 from rake_nltk import Rake
 import mysql.connector
 
 mydb = connect_db()
-db_connection_string = "mysql+mysqlconnector://root:root@localhost:3306/movierecommendation"
-engine = create_engine(db_connection_string)
+engine = create_engine(db_connection_string_mr)
 nlp = spacy.load("en_core_web_lg")
 
 

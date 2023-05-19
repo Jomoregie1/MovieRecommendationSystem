@@ -5,6 +5,7 @@ from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_admin import Admin as FlaskAdmin
 from System.Admin.views import PendingMoviesView
+from System.database import db_connection_string_mr
 
 # login manager instance created
 login_manager = LoginManager()
@@ -15,7 +16,7 @@ app.config['SECRET_KEY'] = 'mysecretkey'
 app.config['SECURITY_PASSWORD_SALT'] = 'your_security_password_salt_here'
 
 # Database setup -----------------------
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:root@localhost/movierecommendation'
+app.config['SQLALCHEMY_DATABASE_URI'] = db_connection_string_mr
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 Migrate(app, db)

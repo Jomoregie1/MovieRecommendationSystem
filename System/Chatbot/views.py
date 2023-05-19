@@ -4,13 +4,14 @@ from chatterbot import ChatBot
 from chatterbot.conversation import Statement
 from System.models import User
 from System.decorators import non_admin_required
+from System.database import db_connection_string_cb
 
 bot = Blueprint('chatbot', __name__)
 
 chatbot = ChatBot(
     'Buddy',
     storage_adapter='System.Chatbot.logicadapter.CustomSQLStorageAdapter',
-    database_uri='mysql+mysqlconnector://root:root@localhost:3306/chatbot',
+    database_uri=db_connection_string_cb,
     logic_adapters=[
         {
             'import_path': 'System.Chatbot.logicadapter.UserConversationLogicAdapter',
@@ -38,6 +39,7 @@ chatbot = ChatBot(
         }
     ]
 )
+
 
 def reset_adapters(chatbot):
     for adapter in chatbot.logic_adapters:
@@ -94,7 +96,6 @@ def get_response_and_image_url(chatbot, user_message, conversation, user_id):
 @bot.route('/', methods=['GET', 'POST'])
 @non_admin_required
 def chat():
-
     global user_name
 
     if request.method == 'POST':
